@@ -24,7 +24,7 @@ tasks.named('processResources') {
     }
     from('data') { include '*.json'; into 'data' }
 }
-tasks.register('processUiResources', Copy) {
+tasks.register('processUiResources', Sync) {
     from project(':ui').layout.buildDirectory.dir('dist')
     into layout.buildDirectory.dir('resources/main/ui')
     dependsOn project(':ui').tasks.named('assemble')

@@ -146,7 +146,7 @@ def compile_catalog(cache,output):
         mapping={};reviews[o]={};source_index[o]={}
         for c in order(set(edges[o])|set(pending[o])):
             if not edges[o][c] and not pending[o][c]:continue
-            if pending[o][c]:
+            if pending[o][c] - (edges[o][c] or {c}):
                 candidates=candidate_order(o,edges[o][c]|pending[o][c],c)
                 reviews[o][c]={'candidates':candidates,'reasons':sorted(reasons[o][c]),'evidence':sorted(proof[o][c]),'links':list(dict.fromkeys(item['url'] for item in references[c]))[:8]}
             # Known character relations remain usable; only unproved extra
@@ -166,13 +166,30 @@ def compile_catalog(cache,output):
                     mappings[direction][alias]=mappings[direction][canonical]
                     references[alias].append({'label':f'Unicode 规范等价 U+{point:04X}','url':'https://www.unicode.org/reports/tr15/'})
                     compatibility_sources[alias]=canonical
-    common={c:values for c,values in mappings['v2s'].items() if mappings['v2t'].get(c)==values}
-    for o in mappings:
-        for c in common:mappings[o].pop(c,None)
+    # Identity-only entries have no effect: unmatched input is already kept.
+    # Remove them after compatibility aliases inherit their explicit targets.
+    for direction in mappings:
+        mappings[direction]={c:values for c,values in mappings[direction].items() if values!=[c]}
+    # Keep a source in common only when both its active mapping and proposed
+    # extra candidates are direction independent. This also partitions reviews.
+    common={};common_reviews={}
+    keys=set().union(*(set(mappings[o])|set(reviews[o]) for o in mappings))
+    common_keys=set()
+    for c in order(keys):
+        left,right=(mappings[o].get(c,[c]) for o in ['v2s','v2t'])
+        sr,tr=(reviews[o].get(c) for o in ['v2s','v2t'])
+        if left!=right or (sr and sr['candidates'])!=(tr and tr['candidates']):continue
+        common_keys.add(c)
+        if left!=[c]:common[c]=left
+        if sr:
+            common_reviews[c]={field:sorted(set(sr[field])|set(tr[field])) for field in ['reasons','evidence','links']}
+            common_reviews[c]['candidates']=sr['candidates']
+        for direction in mappings:
+            mappings[direction].pop(c,None);reviews[direction].pop(c,None)
     punctuation={'︵':'（','︶':'）','︻':'【','︼':'】','﹁':'「','﹂':'」','﹃':'『','﹄':'』','︽':'《','︾':'》','︿':'〈','﹀':'〉'}
     for c,t in punctuation.items():common[c]=[t]
-    mappings['common']=common;reviews['common']={};source_index['common']={}
-    for c in common:
+    mappings['common']=common;reviews['common']=common_reviews;source_index['common']={}
+    for c in order(common_keys|set(punctuation)):
         refs=list({(item['label'],item['url']):item for item in references[c]}.values())
         if c in punctuation:refs=[{'label':'竖排标点：维护者确认的横排对应','url':'https://www.unicode.org/charts/PDF/UFE30.pdf'}]
         if refs:source_index['common'][c]=refs
@@ -181,6 +198,8 @@ def compile_catalog(cache,output):
         if alias not in common:
             for direction in ['v2s','v2t']:
                 if alias in mappings[direction]:source_index[direction][alias]=references[alias]
+    for direction in mappings:
+        source_index[direction]={c:refs for c,refs in source_index[direction].items() if c in mappings[direction] or c in reviews[direction]}
     for o,mapping in mappings.items():
         body=',\n'.join(json.dumps(c,ensure_ascii=False)+': '+json.dumps(v,ensure_ascii=False) for c,v in sorted(mapping.items(),key=lambda item:tuple(map(ord,item[0]))))
         (output/f'{o}.json').write_text('{\n'+body+'\n}\n',encoding='utf-8',newline='\n')

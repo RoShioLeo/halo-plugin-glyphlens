@@ -3,6 +3,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { Dialog, Toast, VButton, VCard, VEmpty, VLoading, VModal, VPageHeader } from '@halo-dev/components';
 import { unicodeInput, unicodeCodes } from './unicode';
+import { batchAction, mappingStatus } from './selection';
 import LexiconView from './LexiconView.vue';
 import FeedbackView from './FeedbackView.vue';
 import SourcesView from './SourcesView.vue';
@@ -17,7 +18,10 @@ const result = ref({items: [], total: 0, version: null, effectiveCount: 0, chang
 const loading = ref(false);
 const saving = ref(false);
 const selected = ref([]);
-const selectable = computed(() => result.value.items.filter(row => row.source !== 'disabled'));
+const selectable = computed(() => result.value.items);
+const selectedAction = computed(() => batchAction(result.value.items, selected.value));
+const actionLabels = {disable:'停用',enable:'启用',approve:'审核'};
+const batchReview = reactive({visible:false, rows:[], option:'v2s', version:null, confirmed:false});
 const allSelected = computed(() => selectable.value.length > 0 && selectable.value.every(row => selected.value.includes(row.character)));
 const error = ref('');
 const editorVisible = ref(false);
@@ -64,24 +68,30 @@ watch([option, source], () => { page.value = 1; editorVisible.value = false; loa
 onMounted(load);
 function search() { page.value = 1; load(); }
 function toggleAll() { selected.value = allSelected.value ? [] : selectable.value.map(row => row.character); }
-function disableSelected() {
-    if (!selected.value.length || saving.value) return;
+async function saveBatch(action, characters, selectedOption, version, confirmed=false) {
+    saving.value=true;
+    try {
+        await request(`${api}/${selectedOption}/batch`, {method:'PUT',body:JSON.stringify({action,characters,version,confirmed})});
+        batchReview.visible=false;
+        Toast.success('已保存');await load();
+    } catch(failure) { Toast.error(failure.message); }
+    finally { saving.value=false; }
+}
+function applySelected() {
+    if (!selectedAction.value || saving.value) return;
+    const action=selectedAction.value;
     const characters = [...selected.value];
     const selectedOption = option.value;
     const version = result.value.version ?? null;
+    if(action==='approve') {
+        Object.assign(batchReview,{visible:true,rows:result.value.items.filter(row=>characters.includes(row.character)),option:selectedOption,version,confirmed:false});
+        return;
+    }
     Dialog.warning({
-        title: `停用${selectedOption === 'common' ? '通用' : selectedOption === 'v2s' ? '简体' : '繁体'}字库中选中的 ${characters.length} 项映射？`,
-        description: `原字：${characters.slice(0, 12).join('、')}${characters.length > 12 ? '…' : ''}。转换时将保留原字。`,
-        confirmText: '停用', cancelText: '取消', showCancel: true,
-        onConfirm: async () => {
-            saving.value = true;
-            try {
-                await request(`${api}/${selectedOption}/batch-disable`, {method: 'PUT', body: JSON.stringify({characters, version, note: ''})});
-                Toast.success(`已停用 ${characters.length} 项映射`);
-                await load();
-            } catch (failure) { Toast.error(failure.message); }
-            finally { saving.value = false; }
-        }
+        title: `${actionLabels[action]}所选 ${characters.length} 项映射？`,
+        description: action==='enable' ? '重新启用停用前保存的规则，待审候选仍需单独审核。' : selectedOption === 'common' ? '停用所选通用映射。方向表的有效规则仍会生效。' : '停用所选方向规则后使用通用映射，没有通用映射则保留原字。',
+        confirmText: actionLabels[action], cancelText: '取消', showCancel: true,
+        onConfirm: () => saveBatch(action,characters,selectedOption,version)
     });
 }
 function openEditor(row) {
@@ -107,13 +117,13 @@ function change(row, action) {
     const selectedOption = action === 'reset' && row.scope === 'common' ? 'common' : option.value;
     const version = result.value.version ?? null;
     Dialog.warning({
-        title: action === 'disable' ? `停用「${row.character}」的映射？` : `恢复「${row.character}」的基础映射？`,
-        description: action === 'disable' ? '转换时将保留原字。' : selectedOption === 'common' ? '将恢复通用基础字形，同时影响简体与繁体方向。' : '该字将使用基础字库及通用表中的结果。',
+        title: action === 'disable' ? `停用「${row.character}」的映射？` : action === 'enable' ? `启用「${row.character}」的映射？` : `重置「${row.character}」的映射？`,
+        description: action === 'enable' ? '重新启用停用前保存的规则。' : action === 'disable' ? selectedOption === 'common' ? '停用通用映射，方向表的有效规则仍会生效。' : '停用方向规则后使用通用映射，没有通用映射则保留原字。' : '将恢复本表的基础映射。',
         confirmText: '确认', cancelText: '取消', showCancel: true,
         onConfirm: async () => {
             saving.value = true;
             try {
-                await request(`${api}/${selectedOption}/entries`, {method: 'PUT', body: JSON.stringify({character: row.character, action, version, note: ''})});
+                await request(`${api}/${selectedOption}/entries`, {method: 'PUT', body: JSON.stringify({character: row.character, action, version, note: '', confirmed: false})});
                 Toast.success('已保存');
                 await load();
             } catch (failure) { Toast.error(failure.message); }
@@ -137,6 +147,10 @@ async function download(kind) {
     } catch (failure) { Toast.error(failure.message); }
 }
 const formatCandidates = values => values?.length ? values.join(' / ') : '保持原字';
+const pendingCandidates = row => row.pending ? row.reviewCandidates.filter(value => !row.candidates.includes(value)) : [];
+const rowStatus = mappingStatus;
+const rowStatusLabel = row => ({disabled:'停用',pending:'待审',enabled:'启用'})[rowStatus(row)];
+const rowSource = row => row.source === 'custom' || row.source === 'disabled' ? '自定义修正' : row.source === 'pending' ? '来源资料' : '基础字库';
 const formatTime = value => value ? new Date(value).toLocaleString('zh-CN') : '初始修正';
 function openPublic() { window.open('/tools/glyphlens/', '_blank', 'noopener,noreferrer'); }
 function submitEditor() { document.getElementById('char-edit-form')?.requestSubmit(); }
@@ -152,7 +166,7 @@ async function showSources(row) {
             <div class="actions" v-if="section === 'glyphs'">
                 <VButton :disabled="loading || !!error" @click="showHistory">修改记录</VButton>
                 <VButton :disabled="loading || !!error" @click="download('overrides')">导出修正</VButton>
-                <VButton :disabled="loading || !!error" @click="download('merged')">导出字库</VButton>
+                <VButton :disabled="loading || !!error" @click="download('table')">导出字库</VButton>
                 <VButton :disabled="loading || !!error" @click="download('reviews')">导出待确认</VButton>
                 <VButton @click="openPublic">查看前台</VButton>
             </div>
@@ -192,26 +206,28 @@ async function showSources(row) {
                 <div class="summary">有效映射 {{ result.effectiveCount }} 项 · 自定义修正 {{ result.changedCount }} 项 · 待确认 {{ result.pendingCount || 0 }} 项</div>
                 <div class="actions">
                     <span v-if="selected.length" class="selection-count">已选 {{ selected.length }} 项</span>
-                    <VButton :disabled="!selected.length || loading || saving" :loading="saving" @click="disableSelected">批量停用</VButton>
-                    <VButton v-if="selected.length" :disabled="saving" @click="selected = []">取消选择</VButton>
+                    <VButton :disabled="!selectedAction || loading || saving" :loading="saving" :title="selected.length && !selectedAction ? '混合状态不能批量操作' : undefined" @click="applySelected">{{ actionLabels[selectedAction] || '操作' }}</VButton>
+                    <VButton v-if="selected.length" :disabled="saving" @click="selected = []">取消</VButton>
                 </div>
             </div>
             <VLoading v-if="loading" />
             <VEmpty v-else-if="!result.items.length" title="没有匹配的字形" />
             <div v-else class="table-wrap">
                 <table>
-                    <thead><tr><th class="selection-cell"><input type="checkbox" aria-label="全选当前页可停用映射" :checked="allSelected" :indeterminate="selected.length > 0 && !allSelected" :disabled="!selectable.length || saving" @change="toggleAll"></th><th>原字</th><th>当前候选</th><th>来源</th><th>备注</th><th>操作</th></tr></thead>
+                    <thead><tr><th class="selection-cell"><input type="checkbox" aria-label="全选当前页映射" :checked="allSelected" :indeterminate="selected.length > 0 && !allSelected" :disabled="!selectable.length || saving" @change="toggleAll"></th><th>原字</th><th>映射</th><th>状态</th><th>来源</th><th>备注</th><th>操作</th></tr></thead>
                     <tbody>
                         <tr v-for="row in result.items" :key="row.character">
-                            <td class="selection-cell"><input v-model="selected" type="checkbox" :value="row.character" :aria-label="`选择原字 ${row.character}`" :disabled="row.source === 'disabled' || saving"></td>
+                            <td class="selection-cell"><input v-model="selected" type="checkbox" :value="row.character" :aria-label="`选择原字 ${row.character}`" :disabled="saving"></td>
                             <td><span class="glyph"><span class="character">{{ row.character }}</span><small>{{ unicodeCodes(row.character) }}</small></span></td>
-                            <td><div class="glyph-list"><span v-for="(candidate, index) in (row.candidates?.length ? row.candidates : [row.character])" :key="index" class="glyph"><span class="character">{{ candidate }}</span><small>{{ unicodeCodes(candidate) }}</small></span></div></td>
-                            <td>{{ row.source === 'base' ? '基础字库' : row.source === 'common' ? '通用字形' : row.source === 'common-custom' ? '通用修正' : row.source === 'pending' ? '待确认' : row.source === 'disabled' ? '保持原字' : '自定义修正' }}</td>
+                            <td><span v-if="row.candidates.length === 1 && row.candidates[0] === row.character" class="note">保持原字</span><div v-else class="glyph-list"><span v-for="(candidate, index) in row.candidates" :key="index" class="glyph"><span class="character">{{ candidate }}</span><small>{{ unicodeCodes(candidate) }}</small></span></div><small v-if="pendingCandidates(row).length" class="note">待确认：{{ pendingCandidates(row).join(' / ') }}</small></td>
+                            <td><span class="mapping-status" :class="`mapping-status--${rowStatus(row)}`" :title="row.pending ? '已确定候选继续生效，额外候选待审' : row.source === 'disabled' ? '本表映射已停用' : undefined"><i aria-hidden="true"></i>{{ rowStatusLabel(row) }}</span></td>
+                            <td>{{ rowSource(row) }}</td>
                             <td class="note">{{ row.note }}</td>
                             <td><div class="actions">
-                                <VButton size="xs" :disabled="saving" @click="openEditor(row)">{{ row.pending ? '确认关系' : '编辑' }}</VButton>
+                                <VButton size="xs" :disabled="saving" @click="openEditor(row)">{{ row.pending ? '审核' : '编辑' }}</VButton>
                                 <VButton v-if="row.source !== 'disabled'" size="xs" :disabled="saving" @click="change(row, 'disable')">停用</VButton>
-                                <VButton v-if="['custom','common-custom','disabled'].includes(row.source)" size="xs" :disabled="saving" @click="change(row, 'reset')">恢复</VButton>
+                                <VButton v-if="row.source === 'disabled'" size="xs" :disabled="saving" @click="change(row, 'enable')">启用</VButton>
+                                <VButton v-if="['custom','common-custom','disabled'].includes(row.source)" size="xs" :disabled="saving" @click="change(row, 'reset')">重置</VButton>
                                 <VButton size="xs" @click="showSources(row)">来源</VButton>
                             </div></td>
                         </tr>
@@ -224,6 +240,11 @@ async function showSources(row) {
                 <VButton :disabled="loading || page * 50 >= result.total" @click="page++; load()">下一页</VButton>
             </div>
         </VCard>
+        <VModal :visible="batchReview.visible" title="审核映射" :width="640" @close="batchReview.visible = false">
+            <div class="history table-wrap"><table><thead><tr><th>原字</th><th>确认后的候选顺序</th></tr></thead><tbody><tr v-for="row in batchReview.rows" :key="row.character"><td class="character">{{ row.character }}</td><td>{{ row.reviewCandidates.join(' / ') }}<small v-for="reason in row.reviewReasons" :key="reason">{{ reason }}</small></td></tr></tbody></table></div>
+            <label class="batch-confirm"><input type="checkbox" v-model="batchReview.confirmed" :disabled="saving">已核对所选映射及候选顺序</label>
+            <div class="editor-actions"><VButton :disabled="saving" @click="batchReview.visible=false">取消</VButton><VButton type="primary" :loading="saving" :disabled="!batchReview.confirmed || saving" @click="saveBatch('approve',batchReview.rows.map(row=>row.character),batchReview.option,batchReview.version,true)">确认</VButton></div>
+        </VModal>
         <VModal :visible="editorVisible" :title="edit.existing ? '编辑映射' : '新增映射'" :width="560" @close="editorVisible = false">
             <FormKit id="char-edit-form" type="form" :actions="false" :disabled="saving" @submit="save">
                 <div v-if="edit.pending" class="review-note"><p v-for="reason in edit.reasons" :key="reason">{{ reason }}</p><a v-for="(url,index) in edit.links" :key="url" :href="url" target="_blank" rel="noopener noreferrer">来源 {{ index+1 }} </a></div>
@@ -237,7 +258,7 @@ async function showSources(row) {
             <template #footer>
                 <div class="editor-actions">
                     <VButton :disabled="saving" @click="editorVisible = false">取消</VButton>
-                    <VButton type="primary" :loading="saving" :disabled="edit.pending && !edit.confirmed" @click="submitEditor">{{ edit.pending ? '确认并保存' : '保存' }}</VButton>
+                    <VButton type="primary" :loading="saving" :disabled="edit.pending && !edit.confirmed" @click="submitEditor">{{ edit.pending ? '确认' : '保存' }}</VButton>
                 </div>
             </template>
         </VModal>
@@ -287,6 +308,11 @@ td small { display: block; font-size: 10px; opacity: .6; }
 .glyph { display: inline-flex; flex-direction: column; align-items: flex-start; }
 .glyph small { display: block; margin-top: 2px; font-size: 10px; line-height: 1.5; opacity: .6; }
 .glyph-list { display: flex; flex-wrap: wrap; align-items: start; gap: 12px 20px; }
+.mapping-status { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.mapping-status i { width: 8px; height: 8px; flex: none; border-radius: 50%; background: #16a34a; }
+.mapping-status--disabled i { background: #dc2626; }
+.mapping-status--pending i { background: #d69e12; }
+.batch-confirm { display: flex; align-items: center; gap: 8px; margin: 16px 0; }
 .edit-preview { display: flex; flex-wrap: wrap; gap: 12px 20px; margin: -8px 0 20px; }
 .note { min-width: 120px; max-width: 240px; overflow-wrap: anywhere; }
 .pagination { display: flex; align-items: center; justify-content: end; flex-wrap: wrap; gap: 12px; padding: 16px 8px 0; font-size: 13px; }

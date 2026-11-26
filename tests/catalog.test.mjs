@@ -4,12 +4,21 @@ import fs from 'node:fs';
 import { GlyphConverter } from '../web/engine.js';
 const read=name=>JSON.parse(fs.readFileSync(new URL('../data/'+name,import.meta.url),'utf8'));
 const common=read('common.json'),simple=read('v2s.json'),traditional=read('v2t.json');
+const reviews=read('reviews.json');
 const scalar=value=>[...value].length===1 && !(value.codePointAt(0)>=0xD800&&value.codePointAt(0)<=0xDFFF);
 test('all compiled records are single Unicode scalars and directional tables do not duplicate common',()=>{
     for(const dictionary of [common,simple,traditional])for(const [source,candidates]of Object.entries(dictionary)) {
         assert(scalar(source));assert(candidates.length>0);assert(candidates.every(scalar));assert.equal(new Set(candidates).size,candidates.length);
+        assert.notDeepEqual(candidates,[source],`identity-only entry: ${source}`);
     }
     for(const direction of [simple,traditional])for(const source of Object.keys(direction))assert(!Object.hasOwn(common,source));
+    const commonKeys=new Set([...Object.keys(common),...Object.keys(reviews.common)]);
+    for(const [direction,table] of [['v2s',simple],['v2t',traditional]]) {
+        for(const source of [...Object.keys(table),...Object.keys(reviews[direction])])assert(!commonKeys.has(source),`common source repeated: ${source}`);
+    }
+    for(const [direction,table] of [['common',common],['v2s',simple],['v2t',traditional]]) {
+        for(const [source,review] of Object.entries(reviews[direction]))assert(review.candidates.some(c=>!(table[source]||[source]).includes(c)),`review has no extra candidate: ${source}`);
+    }
 });
 test('the twelve explicitly requested vertical punctuation pairs work in both directions',()=>{
     for(const [direction,table]of [['v2s',simple],['v2t',traditional]]) {

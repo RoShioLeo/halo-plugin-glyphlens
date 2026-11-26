@@ -1,0 +1,37 @@
+name: Build GlyphLens
+on:
+  push:
+    branches: [main, 'dev/**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.16.1
+          package_json_file: ui/package.json
+      - name: Test conversion and compiled data
+        run: node --test tests/*.test.mjs
+      - name: Verify reproducible research inputs
+        run: |
+          python scripts/restore_research.py
+          python scripts/prepare_catalog.py --cache .research --output .research/rebuilt
+          python scripts/verify_catalog.py --rebuilt .research/rebuilt
+      - name: Build and test plugin
+        run: bash ./gradlew build --no-daemon --console=plain
+      - uses: actions/upload-artifact@v4
+        with:
+          name: glyphlens-dev
+          path: build/libs/*.jar

@@ -1,0 +1,40 @@
+plugins {
+    id 'java'
+    id 'io.freefair.lombok' version '9.2.0'
+    id 'run.halo.plugin.devtools' version '0.9.0'
+}
+group = 'cloud.lemonslice.glyph'
+repositories { mavenCentral() }
+dependencies {
+    implementation platform('run.halo.tools.platform:plugin:2.25.0')
+    compileOnly 'run.halo.app:api'
+    testImplementation 'run.halo.app:api'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'io.projectreactor:reactor-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8'; options.release = 21 }
+test { useJUnitPlatform() }
+tasks.named('processResources') {
+    from('web') {
+        into 'web'
+        filteringCharset = 'UTF-8'
+        filesMatching('index.html') { filter { line -> line == '<head>' ? line + '\n    <base href="/tools/glyphlens/">' : line } }
+    }
+    from('data') { include '*.json'; into 'data' }
+}
+tasks.register('processUiResources', Copy) {
+    from project(':ui').layout.buildDirectory.dir('dist')
+    into layout.buildDirectory.dir('resources/main/ui')
+    dependsOn project(':ui').tasks.named('assemble')
+    shouldRunAfter tasks.named('processResources')
+}
+tasks.named('classes') { dependsOn tasks.named('processUiResources') }
+tasks.named('jar') {
+    from('LICENSE') { into 'META-INF' }
+    from('NOTICE.md') { into 'META-INF' }
+    from('licenses') { into 'META-INF/licenses' }
+}
+tasks.named('generatePluginComponentsIdx') { notCompatibleWithConfigurationCache('Plugin component indexing uses Task.project.') }
+halo { version = '2.27.2' }

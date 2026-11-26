@@ -1,0 +1,8 @@
+.gradle/
+**/build/
+**/node_modules/
+.cache/
+.research/
+*.log
+__pycache__/
+.DS_Store

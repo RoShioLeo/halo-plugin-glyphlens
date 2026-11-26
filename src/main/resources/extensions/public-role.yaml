@@ -1,0 +1,11 @@
+apiVersion: v1alpha1
+kind: Role
+metadata:
+  name: lemonslice-glyphlens-public
+  labels:
+    rbac.authorization.halo.run/aggregate-to-anonymous: "true"
+rules:
+  - nonResourceURLs: ["/tools/glyphlens", "/tools/glyphlens/**", "/tools/char", "/tools/char/**"]
+    verbs: ["get"]
+  - nonResourceURLs: ["/tools/glyphlens/feedback"]
+    verbs: ["post"]

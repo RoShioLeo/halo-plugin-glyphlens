@@ -1,0 +1,61 @@
+{
+  "Unihan-17.0.0.zip": {
+    "url": "https://www.unicode.org/Public/17.0.0/ucd/Unihan.zip",
+    "bytes": 8518517,
+    "sha256": "f7a48b2b545acfaa77b2d607ae28747404ce02baefee16396c5d2d7a8ef34b5e"
+  },
+  "TGH-official.zip": {
+    "url": "https://www.moe.gov.cn/publicfiles/business/htmlfiles/moe/cmsmedia/other/2013/7/other98742.zip",
+    "bytes": 40567295,
+    "sha256": "45e2f58fc19260a0f578de3ff5e273c4d4e6b4bcdd9a1580059e191ab3c9bee3"
+  },
+  "TGH-official.html": {
+    "url": "https://www.moe.gov.cn/jyb_xwfb/moe_2082/siju/yywzxxgls/ztzl_yywzgfbz/201306/t20130601_186002.html",
+    "bytes": 13486,
+    "sha256": "857a2233777ff736e443ec513d0269f8f2ee3f27ba74368f16e5f45c1150b085"
+  },
+  "TGH-notice.html": {
+    "url": "https://www.moe.gov.cn/srcsite/A19/s229/201310/t20131015_159487.html",
+    "bytes": 20404,
+    "sha256": "833f9a64cf7a69ba43519c40cdf8e3f0e98529871d953b32339b40c2c94dc49a"
+  },
+  "TGH-transcription-data.js": {
+    "url": "https://raw.githubusercontent.com/frankslin/cn-characters-standard/5a3cadc72e65e1c91affa4f8bcd72ef8597aa03d/data.js",
+    "bytes": 471664,
+    "sha256": "a0299971fc425acabaff04ede34acdf0a9ab60b4071b2e097c1dd033a4f3a48e"
+  },
+  "TSCharacters.txt": {
+    "url": "https://raw.githubusercontent.com/BYVoid/OpenCC/fae2a0a911c30764e669a7d8b0591cd8e852934a/data/dictionary/TSCharacters.txt",
+    "bytes": 104520,
+    "sha256": "9ff46a7d30e5765375eb13d33f2b03a34d298913caf2b120380679f33ae1642d"
+  },
+  "STCharacters.txt": {
+    "url": "https://raw.githubusercontent.com/BYVoid/OpenCC/fae2a0a911c30764e669a7d8b0591cd8e852934a/data/dictionary/STCharacters.txt",
+    "bytes": 36026,
+    "sha256": "a0ca1601c70648cf48b33c3c6210ccbecc5c7eead4b4c3daf76587ba2c03582b"
+  },
+  "TWVariants.txt": {
+    "url": "https://raw.githubusercontent.com/BYVoid/OpenCC/fae2a0a911c30764e669a7d8b0591cd8e852934a/data/dictionary/TWVariants.txt",
+    "bytes": 978,
+    "sha256": "245b94eb5842957e735dd44b7e7d4ff469a3643126cc8fa511adda5281e9cb86"
+  },
+  "OpenCC-LICENSE": {
+    "url": "https://raw.githubusercontent.com/BYVoid/OpenCC/fae2a0a911c30764e669a7d8b0591cd8e852934a/LICENSE",
+    "bytes": 9165,
+    "sha256": "b534e465949558eec2597b04f5092b5e161236a68dfbfd04d547592ac3964308"
+  },
+  "repositories": {
+    "OpenCC": {
+      "commit": "fae2a0a911c30764e669a7d8b0591cd8e852934a"
+    },
+    "TGH-transcription": {
+      "commit": "5a3cadc72e65e1c91affa4f8bcd72ef8597aa03d",
+      "date": "2026-07-05T22:40:11Z"
+    },
+    "CJKVI": {
+      "commit": "e4f1da248c9737a243f9930b5dc497cef5d5ae16",
+      "date": "2015-09-23",
+      "use": "unconfirmed transcription clues only"
+    }
+  }
+}

@@ -1,0 +1,10 @@
+plugins { id 'base'; id 'com.github.node-gradle.node' version '7.1.0' }
+node { pnpmVersion = '12.16.1' }
+tasks.register('pnpmBuild', PnpmTask) {
+    args = ['build']
+    dependsOn tasks.named('pnpmInstall')
+    inputs.dir('src')
+    inputs.files('package.json', 'vite.config.mjs')
+    outputs.dir(layout.buildDirectory.dir('dist'))
+}
+tasks.named('assemble') { dependsOn tasks.named('pnpmBuild') }

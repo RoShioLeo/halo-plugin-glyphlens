@@ -1,0 +1,11 @@
+{
+  "name": "@lemonslice/glyphlens-admin",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {"build": "vite build"},
+  "dependencies": {"@halo-dev/components": "2.26.0", "@halo-dev/ui-shared": "2.26.0", "vue": "3.5.41"},
+  "devDependencies": {"@halo-dev/ui-plugin-bundler-kit": "2.26.0", "@vitejs/plugin-vue": "6.0.10", "vite": "8.3.5", "typescript": "6.0.3"},
+  "packageManager": "pnpm@12.16.1"
+}

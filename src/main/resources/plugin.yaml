@@ -1,0 +1,19 @@
+apiVersion: plugin.halo.run/v1alpha1
+kind: Plugin
+metadata:
+  name: lemonslice-glyphlens
+spec:
+  enabled: true
+  requires: ">=2.26.0"
+  author:
+    name: RoShioLeo
+    website: https://www.lemonslice.cloud
+  logo: logo.svg
+  homepage: https://www.lemonslice.cloud/tools/glyphlens/
+  repo: https://github.com/RoShioLeo/halo-plugin-glyphlens
+  issues: https://github.com/RoShioLeo/halo-plugin-glyphlens/issues
+  displayName: 字镜 · GlyphLens
+  description: 单字字形归一与繁简转换、多字候选、超级管理员字库管理及关系审核
+  license:
+    - name: MIT (original code)
+      url: https://opensource.org/license/mit

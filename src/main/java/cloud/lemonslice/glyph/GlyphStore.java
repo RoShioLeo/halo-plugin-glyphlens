@@ -32,6 +32,9 @@ public final class GlyphStore {
     public record Batch(List<String> characters, String note, Long version) {}
     public record BatchChange(List<String> characters, String action, Long version, Boolean confirmed) {}
     public record Saved(Long version) {}
+    public record VariantChange(String character, List<String> simplified, List<String> traditional, String note, Long version, Boolean confirmed) {}
+    public record VariantRow(String direction, String character, List<String> before, List<String> candidates, boolean reviewRequired, boolean disabled) {}
+    public record VariantPreview(Long version, List<VariantRow> rows, boolean confirmationRequired) {}
     public record Row(String character, List<String> candidates, List<String> baseCandidates, String source, String scope, String note,
                       boolean pending, boolean reviewRequired, List<String> savedCandidates, List<String> reviewCandidates, List<String> reviewReasons, List<String> reviewLinks) {}
     public record Page(List<Row> items, int total, int page, int size, Long version, int effectiveCount, int changedCount, int pendingCount) {}
@@ -161,6 +164,57 @@ public final class GlyphStore {
         });
     }
     public Mono<State> state(String direction) { return snapshot(direction).map(View::value); }
+    private VariantPreview variantPlan(VersionedDocuments.Snapshot<Database> snapshot, VariantChange request) {
+        String character=UnicodeInput.character(request.character());
+        Map<String,List<String>> additions=new LinkedHashMap<>();
+        for(String direction:List.of("v2s","v2t")) {
+            List<String> values=direction.equals("v2s") ? request.simplified() : request.traditional();
+            if(values==null || values.isEmpty()) continue;
+            if(values.size()>50) throw UnicodeInput.invalid("每个方向最多 50 个候选字");
+            additions.put(direction,values.stream().map(UnicodeInput::character).distinct().toList());
+        }
+        if(additions.isEmpty()) throw UnicodeInput.invalid("简体或繁体至少填写一项");
+        note(request.note());
+        State common=snapshot.value().tables().getOrDefault("common",State.initial());
+        List<VariantRow> rows=new ArrayList<>();
+        for(String direction:additions.keySet()) {
+            State state=snapshot.value().tables().getOrDefault(direction,State.initial());
+            Map<String,List<String>> effective=merged(direction,state,common);
+            Entry old=state.entries().get(character);
+            // New candidates supplement existing mappings, including a common
+            // fallback, without introducing reverse edges from any target.
+            List<String> existing=old!=null && old.candidates()!=null ? old.candidates()
+                : catalog.mapping(direction).getOrDefault(character,table("common",common).getOrDefault(character,List.of()));
+            var candidates=new LinkedHashSet<>(existing);
+            candidates.addAll(additions.get(direction));
+            if(candidates.size()>50) throw UnicodeInput.invalid("合并后候选超过 50 个，请先编辑已有映射");
+            boolean review=catalog.reviews(direction).containsKey(character) && (old==null || !old.approved() || old.disabled());
+            rows.add(new VariantRow(direction,character,effective.getOrDefault(character,List.of(character)),List.copyOf(candidates),review,old!=null && old.disabled()));
+        }
+        return new VariantPreview(snapshot.version(),rows,rows.stream().anyMatch(row->row.reviewRequired() || row.disabled()));
+    }
+    public Mono<VariantPreview> previewVariant(VariantChange request) { return database().map(snapshot->variantPlan(snapshot,request)); }
+    public Mono<Saved> saveVariant(VariantChange request,String actor) {
+        return database().flatMap(snapshot->{
+            if(!java.util.Objects.equals(snapshot.version(),request.version())) return Mono.error(VersionedDocuments.conflict());
+            VariantPreview plan=variantPlan(snapshot,request);
+            if(plan.confirmationRequired() && !Boolean.TRUE.equals(request.confirmed()))
+                return Mono.error(UnicodeInput.invalid("请确认待审或停用的映射"));
+            var tables=new LinkedHashMap<>(snapshot.value().tables());
+            String now=Instant.now().toString(), suppliedNote=note(request.note());
+            for(VariantRow row:plan.rows()) {
+                State previous=tables.getOrDefault(row.direction(),State.initial());
+                var entries=new LinkedHashMap<>(previous.entries());var history=new ArrayList<>(previous.history());
+                Entry old=entries.get(row.character());
+                String entryNote=suppliedNote.isBlank() && old!=null ? old.note() : suppliedNote;
+                entries.put(row.character(),new Entry(row.candidates(),false,entryNote,actor,now,true));
+                history.add(new Audit(row.character(),"override",row.before(),row.candidates(),entryNote,actor,now));
+                tables.put(row.direction(),new State(entries,history,previous.migrated()));
+            }
+            // Both directions share one version and one ConfigMap write.
+            return documents.write(snapshot,request.version(),new Database(tables,snapshot.value().migrated())).map(Saved::new);
+        });
+    }
     public Mono<List<Audit>> history(String direction) { return state(direction).map(state -> state.history().reversed().stream().limit(500).toList()); }
     public Map<String,Object> sources() { return catalog.sources(); }
     @SuppressWarnings("unchecked")

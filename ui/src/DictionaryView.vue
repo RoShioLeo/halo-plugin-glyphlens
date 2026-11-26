@@ -29,7 +29,25 @@ const historyVisible = ref(false);
 const history = ref([]);
 const sourceVisible = ref(false);
 const sourceRecords = ref([]);
-const edit = reactive({character: '', candidates: '', note: '', existing: false, version: null, option: 'v2s', pending:false, confirmed:false, reasons:[], links:[]});
+const edit = reactive({character: '', candidates: '', simplified:'', traditional:'', kind:'variant', note: '', existing: false, version: null, option: 'v2s', pending:false, confirmed:false, reasons:[], links:[]});
+const variantMode = computed(() => !edit.existing && edit.kind === 'variant');
+const variantPreview = ref(null), previewLoading = ref(false), previewError = ref('');
+const lines = value => value.split('\n').map(value => value.trim()).filter(Boolean);
+const variantBody = () => ({character:edit.character, simplified:lines(edit.simplified), traditional:lines(edit.traditional), note:edit.note});
+let previewSequence=0, previewTimer;
+watch(() => [editorVisible.value, edit.existing, edit.kind, edit.character, edit.simplified, edit.traditional], () => {
+    const ticket=++previewSequence;
+    clearTimeout(previewTimer);variantPreview.value=null;previewError.value='';previewLoading.value=false;edit.confirmed=false;
+    if(!editorVisible.value || !variantMode.value || !edit.character.trim() || (!lines(edit.simplified).length && !lines(edit.traditional).length)) return;
+    previewLoading.value=true;
+    previewTimer=setTimeout(async () => {
+        try {
+            const data=await request(`${api}/variant/preview`,{method:'POST',body:JSON.stringify(variantBody())});
+            if(ticket===previewSequence) variantPreview.value=data;
+        } catch(failure) { if(ticket===previewSequence) previewError.value=failure.message; }
+        finally { if(ticket===previewSequence) previewLoading.value=false; }
+    },200);
+}, {flush:'sync'});
 const candidatePreview = computed(() => edit.candidates.split('\n').filter(value => value.trim()).map(value => {
     try { const character = unicodeInput(value); return {character, code: unicodeCodes(character)}; }
     catch (failure) { return {error: failure.message}; }
@@ -97,14 +115,26 @@ function applySelected() {
 function openEditor(row) {
     Object.assign(edit, {character: row?.character || '', candidates: (row?.savedCandidates || (row?.reviewRequired ? row.reviewCandidates : row?.candidates) || []).join('\n'),
         note: row?.note || '', existing: !!row, version: result.value.version ?? null, option: option.value,
-        pending:!!row?.reviewRequired,confirmed:false,reasons:row?.reviewReasons || [],links:row?.reviewLinks || []});
+        pending:!!row?.reviewRequired,confirmed:false,reasons:row?.reviewReasons || [],links:row?.reviewLinks || [],
+        kind:option.value==='common'?'common':'variant',simplified:'',traditional:''});
     editorVisible.value = true;
 }
 async function save() {
+    if(variantMode.value) {
+        if(!variantPreview.value || previewLoading.value) { Toast.error(previewError.value || '填写原字及至少一种候选字'); return; }
+        if(variantPreview.value.confirmationRequired && !edit.confirmed) { Toast.error('请确认待审或停用的映射'); return; }
+        saving.value=true;
+        try {
+            await request(`${api}/variant`,{method:'PUT',body:JSON.stringify({...variantBody(),version:variantPreview.value.version,confirmed:edit.confirmed})});
+            editorVisible.value=false;Toast.success('已保存');await load();
+        } catch(failure) { Toast.error(failure.message); }
+        finally { saving.value=false; }
+        return;
+    }
     if(edit.pending && !edit.confirmed) { Toast.error('请先确认字形关系及候选顺序'); return; }
     saving.value = true;
     try {
-        await request(`${api}/${edit.option}/entries`, {method: 'PUT', body: JSON.stringify({character: edit.character,
+        await request(`${api}/${edit.existing ? edit.option : 'common'}/entries`, {method: 'PUT', body: JSON.stringify({character: edit.character,
             candidates: edit.candidates.split('\n').map(value => value.trim()).filter(Boolean), note: edit.note,
             action: edit.pending ? 'approve' : 'override', confirmed:edit.confirmed, version: edit.version})});
         editorVisible.value = false;
@@ -247,18 +277,38 @@ async function showSources(row) {
         </VModal>
         <VModal :visible="editorVisible" :title="edit.existing ? '编辑映射' : '新增映射'" :width="560" @close="editorVisible = false">
             <FormKit id="char-edit-form" type="form" :actions="false" :disabled="saving" @submit="save">
+                <FormKit v-if="!edit.existing" v-model="edit.kind" type="select" label="类型" :options="[{label:'通用',value:'common'},{label:'繁简',value:'variant'}]" />
                 <div v-if="edit.pending" class="review-note"><p v-for="reason in edit.reasons" :key="reason">{{ reason }}</p><a v-for="(url,index) in edit.links" :key="url" :href="url" target="_blank" rel="noopener noreferrer">来源 {{ index+1 }} </a></div>
-                <FormKit v-model="edit.character" type="text" label="原字" validation="required" :disabled="edit.existing" :help="edit.existing ? undefined : '支持字形、U+4E00、0x4E00、4E00'" />
+                <FormKit v-model="edit.character" type="text" label="原字" validation="required" :delay="0" :disabled="edit.existing" :help="edit.existing ? undefined : '支持字形、U+4E00、0x4E00、4E00'" />
                 <div v-if="!edit.existing && characterPreview" class="edit-preview"><span class="glyph"><span class="character">{{ characterPreview }}</span><small>{{ unicodeCodes(characterPreview) }}</small></span></div>
-                <FormKit v-model="edit.candidates" type="textarea" label="候选字" help="每行一个候选，支持字形或十六进制 Unicode 码。" validation="required" :rows="5" />
-                <div class="edit-preview"><template v-for="(candidate, index) in candidatePreview" :key="index"><span v-if="!candidate.error" class="glyph"><span class="character">{{ candidate.character }}</span><small>{{ candidate.code }}</small></span><span v-else role="alert">{{ candidate.error }}</span></template></div>
+                <template v-if="variantMode">
+                    <div class="variant-fields">
+                        <div class="variant-column"><FormKit v-model="edit.simplified" type="textarea" label="简体候选" outer-class="variant-field" :rows="3" :delay="0" placeholder="选填" /></div>
+                        <div class="variant-column"><FormKit v-model="edit.traditional" type="textarea" label="繁体候选" outer-class="variant-field" :rows="3" :delay="0" placeholder="选填" /></div>
+                    </div>
+                    <p class="variant-help">至少填写一项，每行一个候选；未填写的方向不修改。</p>
+                    <p v-if="previewError" role="alert">{{ previewError }}</p>
+                    <div v-if="variantPreview" class="variant-preview">
+                        <div v-for="row in variantPreview.rows" :key="row.direction">
+                            <span>{{ row.direction==='v2s'?'转简体':'转繁体' }}</span>
+                            <span>{{ row.character }} → {{ row.candidates.join(' / ') }}</span>
+                            <small v-if="row.disabled">将启用</small><small v-else-if="row.reviewRequired">待确认</small>
+                        </div>
+                        <small>已有候选保留，新候选追加。</small>
+                    </div>
+                    <FormKit v-if="variantPreview?.confirmationRequired" v-model="edit.confirmed" type="checkbox" label="确认以上映射并启用" />
+                </template>
+                <template v-else>
+                    <FormKit v-model="edit.candidates" type="textarea" label="候选字" help="每行一个候选，支持字形或十六进制 Unicode 码。" validation="required" :rows="5" />
+                    <div class="edit-preview"><template v-for="(candidate, index) in candidatePreview" :key="index"><span v-if="!candidate.error" class="glyph"><span class="character">{{ candidate.character }}</span><small>{{ unicodeCodes(candidate.character) }}</small></span><span v-else role="alert">{{ candidate.error }}</span></template></div>
+                </template>
                 <FormKit v-model="edit.note" type="textarea" label="备注" :maxlength="300" :rows="2" />
                 <FormKit v-if="edit.pending" v-model="edit.confirmed" type="checkbox" label="我已确认这些字形关系及候选顺序" />
             </FormKit>
             <template #footer>
                 <div class="editor-actions">
                     <VButton :disabled="saving" @click="editorVisible = false">取消</VButton>
-                    <VButton type="primary" :loading="saving" :disabled="edit.pending && !edit.confirmed" @click="submitEditor">{{ edit.pending ? '确认' : '保存' }}</VButton>
+                    <VButton type="primary" :loading="saving" :disabled="saving || (variantMode ? previewLoading || !variantPreview || (variantPreview.confirmationRequired && !edit.confirmed) : edit.pending && !edit.confirmed)" @click="submitEditor">{{ edit.pending ? '确认' : '保存' }}</VButton>
                 </div>
             </template>
         </VModal>
@@ -318,6 +368,17 @@ td small { display: block; font-size: 10px; opacity: .6; }
 .pagination { display: flex; align-items: center; justify-content: end; flex-wrap: wrap; gap: 12px; padding: 16px 8px 0; font-size: 13px; }
 .history { max-height: 60vh; }
 .editor-actions { display: flex; justify-content: end; gap: 8px; }
+.variant-fields { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:16px;padding:0;margin:0; }
+.variant-column { min-width:0; }
+/* FormKit spaces successive fields vertically; each grid column owns its field. */
+.variant-fields :deep(.variant-field) { margin:0 !important;padding:0 !important;border:0 !important;min-width:0; }
+.variant-fields :deep(.formkit-label) { display:block;margin:0 0 8px !important; }
+.variant-fields :deep(.formkit-inner) { margin:0 !important; }
+.variant-fields :deep(textarea) { display:block;box-sizing:border-box;width:100%;min-height:80px;margin:0; }
+.variant-help { font-size:12px;line-height:1.5;opacity:.7;margin:8px 0 16px; }
+.variant-preview { margin:0 0 16px;font-size:13px; }
+.variant-preview > div { display:flex;align-items:baseline;flex-wrap:wrap;gap:8px 16px;padding:8px 0; }
+.variant-preview small { opacity:.7;font-size:12px; }
 .section-nav { padding: 0 4px; }
 .review-note { padding: 12px; margin-bottom: 16px; border: 1px solid #e0bc54; border-radius: 6px; font-size: 13px; }
 .review-note p { margin: 0 0 6px; }

@@ -27,6 +27,8 @@ public final class GlyphEndpoint implements CustomEndpoint {
         return RouterFunctions.route()
             .GET("/dictionaries/{direction}",request -> secured(actor -> glyphs.list(request.pathVariable("direction"),request.queryParam("query").orElse(""),request.queryParam("source").orElse("all"),number(request,"page",1),number(request,"size",50))))
             .PUT("/dictionaries/{direction}/entries",request -> secured(actor -> request.bodyToMono(GlyphStore.Change.class).flatMap(body -> glyphs.change(request.pathVariable("direction"),body,actor))))
+            .POST("/dictionaries/variant/preview",request -> secured(actor -> request.bodyToMono(GlyphStore.VariantChange.class).flatMap(glyphs::previewVariant)))
+            .PUT("/dictionaries/variant",request -> secured(actor -> request.bodyToMono(GlyphStore.VariantChange.class).flatMap(body -> glyphs.saveVariant(body,actor))))
             .PUT("/dictionaries/{direction}/batch-disable",request -> secured(actor -> request.bodyToMono(GlyphStore.Batch.class).flatMap(body -> glyphs.disableBatch(request.pathVariable("direction"),body,actor))))
             .PUT("/dictionaries/{direction}/batch",request -> secured(actor -> request.bodyToMono(GlyphStore.BatchChange.class).flatMap(body -> glyphs.batch(request.pathVariable("direction"),body,actor))))
             .GET("/dictionaries/{direction}/history",request -> secured(actor -> glyphs.history(request.pathVariable("direction"))))

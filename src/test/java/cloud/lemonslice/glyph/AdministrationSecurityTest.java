@@ -34,6 +34,8 @@ class AdministrationSecurityTest {
         for(String path:List.of("/dictionaries/common","/dictionaries/v2s/history","/dictionaries/v2t/export","/sources","/lexicon","/feedback"))client.get().uri(path).exchange().expectStatus().isForbidden();
         client.put().uri("/dictionaries/common/entries").bodyValue("{}").exchange().expectStatus().isForbidden();
         client.put().uri("/dictionaries/v2s/batch-disable").bodyValue("{}").exchange().expectStatus().isForbidden();
+        client.put().uri("/dictionaries/variant").bodyValue("{}").exchange().expectStatus().isForbidden();
+        client.post().uri("/dictionaries/variant/preview").bodyValue("{}").exchange().expectStatus().isForbidden();
         client.post().uri("/migration/char").exchange().expectStatus().isForbidden();
         verifyNoInteractions(glyphs,lexicon,feedback);
     }

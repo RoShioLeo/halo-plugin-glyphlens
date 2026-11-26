@@ -117,4 +117,52 @@ class GlyphStoreTest {
         assertEquals(400,assertThrows(ResponseStatusException.class,()->UnicodeInput.character("U+D800")).getStatusCode().value());
         assertThrows(ResponseStatusException.class,()->UnicodeInput.character("两个"));
     }
+    @Test void variantAddsBothDirectionsForTheSameSourceInOneWriteWithoutReverseMappings() {
+        var request=new GlyphStore.VariantChange("U+20000",List.of("简"),List.of("簡","簡"),"异体对应",null,false);
+        var preview=store.previewVariant(request).block();
+        assertEquals(2,preview.rows().size());assertFalse(preview.confirmationRequired());
+        assertTrue(fixture.resources.isEmpty());
+        assertEquals(0L,store.saveVariant(request,"owner").block().version());
+        assertEquals(List.of("简"),store.effective("v2s").block().get("𠀀"));
+        assertEquals(List.of("簡"),store.effective("v2t").block().get("𠀀"));
+        assertFalse(store.state("v2s").block().entries().containsKey("簡"));
+        assertFalse(store.state("v2t").block().entries().containsKey("简"));
+        assertEquals(1,store.history("v2s").block().size());assertEquals(1,store.history("v2t").block().size());
+        assertEquals(1,fixture.resources.size());
+    }
+    @Test void eitherDirectionMayBeOmittedAndDoesNotTouchTheOtherTable() {
+        store.saveVariant(new GlyphStore.VariantChange("甲",List.of("乙"),null,"",null,false),"owner").block();
+        assertEquals(List.of("丙","乙"),store.effective("v2s").block().get("甲"));
+        assertEquals(List.of("丁"),store.effective("v2t").block().get("甲"));
+        assertTrue(store.state("v2t").block().entries().isEmpty());
+        var before=store.state("v2s").block();
+        store.saveVariant(new GlyphStore.VariantChange("甲",List.of(),List.of("戊"),"",0L,false),"owner").block();
+        assertEquals(before,store.state("v2s").block());
+        assertEquals(List.of("丁","戊"),store.effective("v2t").block().get("甲"));
+    }
+    @Test void invalidSecondDirectionAndStaleVersionNeverPartiallySave() {
+        assertEquals(400,assertThrows(ResponseStatusException.class,()->store.saveVariant(new GlyphStore.VariantChange("甲",List.of("乙"),List.of("两个"),"",null,false),"owner").block()).getStatusCode().value());
+        assertEquals(400,assertThrows(ResponseStatusException.class,()->store.saveVariant(new GlyphStore.VariantChange("甲",null,List.of(),"",null,false),"owner").block()).getStatusCode().value());
+        assertTrue(fixture.resources.isEmpty());
+        var request=new GlyphStore.VariantChange("甲",List.of("乙"),List.of("戊"),"",null,false);
+        store.change("common",change("壹","override",List.of("一"),null,false),"other").block();
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->store.saveVariant(request,"owner").block()).getStatusCode().value());
+        assertTrue(store.state("v2s").block().entries().isEmpty());assertTrue(store.state("v2t").block().entries().isEmpty());
+    }
+    @Test void variantRetainsSavedOrderAndNotesAndRequiresConfirmationForPendingOrDisabled() {
+        store.change("v2s",change("甲","override",List.of("乙","丙"),null,false),"owner").block();
+        store.change("v2s",new GlyphStore.Change("甲","disable",null,"",0L,false),"owner").block();
+        var request=new GlyphStore.VariantChange("甲",List.of("丙","戊"),List.of("己"),"",1L,false);
+        assertTrue(store.previewVariant(request).block().confirmationRequired());
+        assertEquals(400,assertThrows(ResponseStatusException.class,()->store.saveVariant(request,"owner").block()).getStatusCode().value());
+        store.saveVariant(new GlyphStore.VariantChange("甲",List.of("丙","戊"),List.of("己"),"",1L,true),"owner").block();
+        assertEquals(List.of("乙","丙","戊"),store.effective("v2s").block().get("甲"));
+        assertEquals("说明",store.state("v2s").block().entries().get("甲").note());
+        var pending=new GlyphStore.VariantChange("𤎺",List.of("㸇"),List.of("甲"),"",2L,null);
+        assertTrue(store.previewVariant(pending).block().confirmationRequired());
+        assertEquals(400,assertThrows(ResponseStatusException.class,()->store.saveVariant(pending,"owner").block()).getStatusCode().value());
+        assertFalse(store.state("v2t").block().entries().containsKey("𤎺"));
+        store.saveVariant(new GlyphStore.VariantChange("𤎺",List.of("㸇"),List.of("甲"),"",2L,true),"owner").block();
+        assertEquals(List.of("㸇"),store.effective("v2s").block().get("𤎺"));
+    }
 }

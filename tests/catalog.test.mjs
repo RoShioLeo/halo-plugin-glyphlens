@@ -35,14 +35,25 @@ test('documented multiple forms remain usable with original-first coexisting cha
 test('screenshot sources no longer produce the rare inferred simplified targets',()=>{
     const table={...common,...simple};
     for(const [source,rejected]of [['㵾','𪷍'],['㶆','𫞛'],['㷍','𤆢'],['㷿','𤈷'],['㸇','𤎺']])assert(!(table[source]||[source]).includes(rejected));
-    assert.deepEqual(table['𪷍'],['㵾']);
+    assert.equal(table['𪷍'],undefined); // Uncorroborated reverse relation remains inactive.
 });
 
-test('usage tiers put common candidates before rare forms without adding candidates',()=>{
+test('remaining formal usage tiers rank candidates without the withdrawn grading table',()=>{
     const sc={...common,...simple},tc={...common,...traditional};
-    assert.deepEqual(sc['㐺'],['众','乑']);
-    assert.deepEqual(sc['㐁'],['西','㐁']);
-    assert.deepEqual(tc['㐁'],['西','㐁']);
-    assert.equal(sc['〇'][0],'〇');assert.equal(tc['〇'][0],'〇');
-    assert.deepEqual(tc['台'],['台','臺','颱','檯']);
+    assert.deepEqual(sc['仝'],['同','仝']);
+    assert.deepEqual(sc['線'],['线','缐']);
+    assert.deepEqual(tc['台'],['台','檯','臺','颱']);
+});
+
+test('withdrawn-only relations are absent and unknown characters remain unchanged',()=>{
+    for(const [direction,table] of [['v2s',simple],['v2t',traditional]]) {
+        const converter=new GlyphConverter(direction,{...common,...table});
+        assert.equal(converter.convert('㐺㐁〇𪷍'),'㐺㐁〇𪷍');
+        for(const mode of ['common',direction])for(const source of ['㐺','㐁'])assert.equal(reviews[mode][source],undefined);
+    }
+    const sources=read('sources.json');
+    assert.deepEqual(Object.keys(sources.links).sort(),['mainland','opencc','unicode']);
+    for(const data of [sources,reviews])assert(!/moe\.edu\.tw|台湾|異體字字典/.test(JSON.stringify(data)));
+    const manifest=JSON.parse(fs.readFileSync(new URL('../research/inputs-manifest.json',import.meta.url),'utf8'));
+    assert.deepEqual(Object.keys(manifest.files).sort(),['properties.json','sources/STCharacters.txt','sources/TGH-transcription.json','sources/TSCharacters.txt']);
 });

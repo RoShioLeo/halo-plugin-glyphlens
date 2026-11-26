@@ -22,30 +22,21 @@ def compile_catalog(cache,output):
     assert len(standards)==8105 and {row['c'] for row in standards}==standard
     assert sum(len(row.get('t',[])) for row in standards)==2574
     assert sum(len(row.get('v',[])) for row in standards)==1023
-    regular_rows=read('moe-regular.json');relations=read('moe-relations.json')
-    regular={row['character'] for row in regular_rows if row['character']}
     # Table serials and Unicode values are not frequency ranks. Use the
     # published usage tiers; preserve the original only within the same tier.
     simple_tiers={row['c']:row['lv'] for row in standards}
-    traditional_tiers={}
-    for row in regular_rows:
-        if row['character']:
-            tier={'A':1,'B':2,'C':3}.get(row['code'][:1],4)
-            traditional_tiers[row['character']]=min(tier,traditional_tiers.get(row['character'],4))
+    traditional_tiers=dict(simple_tiers)
+    for row in standards:
+        for item in row.get('t',[]):
+            c=item['c']
+            traditional_tiers[c]=min(row['lv'],traditional_tiers.get(c,4))
     def candidate_order(direction,values,source):
         tiers=simple_tiers if direction=='v2s' else traditional_tiers
         # Ideographic zero is used independently as a numeral, outside these
         # Han usage tables. An absent tier must not demote it to historical 星.
         if source=='〇':return order(values,source)
         return sorted(set(values),key=lambda c:(tiers.get(c,4),c!=source,ord(c)))
-    direct=defaultdict(set);references=defaultdict(list)
-    for row in regular_rows:
-        if row['character']:references[row['character']].append({'label':row['code'],'url':f'https://dict.variants.moe.edu.tw/dictView.jsp?ID={row["id"]}'})
-    for row in relations:
-        source,target=row['character'],row['regular_character']
-        if source and target and source!=target:
-            direct[source].add(target)
-            references[source].append({'label':row['code'],'url':f'https://dict.variants.moe.edu.tw/dictView.jsp?ID={row["id"]}'})
+    references=defaultdict(list)
     to_simple=defaultdict(set);to_traditional=defaultdict(set)
     for row in standards:
         for kind in ['t','v']:
@@ -56,15 +47,9 @@ def compile_catalog(cache,output):
                     references[c].append({'label':f'通用规范汉字表 {row["s"]:04}','url':'https://www.moe.gov.cn/jyb_xwfb/moe_2082/siju/yywzxxgls/ztzl_yywzgfbz/201306/t20130601_186002.html'})
                     if kind=='t':to_traditional[row['c']].add(c)
     def simple(c):return (to_simple[c]|({c} if c in standard else set())) or {c}
-    def traditional(c):return {c} if c in regular else (direct[c] or {c})
-    # The mainland annex may print a traditional glyph that the current
-    # variant dictionary encodes as an alias of its regular glyph (爲/為,
-    # 説/說, 裏/裡). Carry only these direct, non-independent aliases across.
-    for original,targets in list(to_simple.items()):
-        for canonical in traditional(original):to_simple[canonical].update(targets)
     def expand(direction,values):
         result=set()
-        for c in values:result.update(simple(c) if direction=='v2s' else traditional(c))
+        for c in values:result.update(simple(c) if direction=='v2s' else {c})
         return result
     def coexist(c):return c in standard and bool(to_simple[c]-{c})
     edges={o:defaultdict(set) for o in ['v2s','v2t']}
@@ -75,38 +60,19 @@ def compile_catalog(cache,output):
     def hold(o,s,values,why):
         if not han(s) or unicodedata.normalize('NFC',s)!=s:return
         pending[o][s].update(t for t in values if han(t) and unicodedata.normalize('NFC',t)==t);reasons[o][s].add(why)
-    for c in regular:
-        add('v2t',c,{c},'中国台湾地区教育主管部门正字：保留原字')
-        add('v2s',c,simple(c),'正字及规范字表简体对应')
-        if coexist(c):hold('v2s',c,simple(c),'繁简均有独立用途，需确认')
     for row in standards:
         c=row['c'];add('v2s',c,{c},'规范字：保留原字')
         if coexist(c):hold('v2s',c,simple(c),'两端均为规范字，需确认繁简兼用关系')
         targets=expand('v2t',to_traditional[c]) if to_traditional[c] else {c}
-        if c in regular or f'U+{ord(c):04X}' in properties.get(c,{}).get('kTraditionalVariant',''):targets.add(c)
-        add('v2t',c,targets,'规范字表繁体对应及正字归一')
+        if f'U+{ord(c):04X}' in properties.get(c,{}).get('kTraditionalVariant',''):targets.add(c)
+        add('v2t',c,targets,'规范字表繁体对应')
         if len(targets)>1 and c in targets:hold('v2t',c,targets,'原字在繁体中独立使用，需确认')
         if any(t in standard and t!=c for t in targets):hold('v2t',c,targets,'对应繁体本身另为规范字，需确认')
-    for c,targets in direct.items():
-        simpler=expand('v2s',targets)
-        if c in standard:
-            legal=simple(c)
-            add('v2s',c,legal,'规范字本字及正式兼用对应')
-            if simpler-legal:hold('v2s',c,simpler-legal,'与规范字本字或正式简体对应不同，待核查')
-            traditional_targets=expand('v2t',to_traditional[c])
-            if traditional_targets:
-                add('v2t',c,targets&traditional_targets,'正异字来源与正式繁体对应相符')
-                if targets-traditional_targets-{c}:hold('v2t',c,targets-traditional_targets,'正式繁体表以外的补充归属，待核查')
-            elif targets-{c}:hold('v2t',c,targets,'规范字的其他历史或地域归属，待核查')
-        else:
-            add('v2t',c,targets,'中国台湾地区教育主管部门当前正异字关系');add('v2s',c,simpler,'中国台湾地区教育主管部门正异字关系及规范字表')
-        if c in regular or c in standard:
-            for o in edges:hold(o,c,edges[o][c]|{c},'同时具正字身份，不能无条件归并')
-        if any(coexist(t) for t in targets):hold('v2s',c,expand('v2s',targets),'所归正字繁简兼用，需先确认该关系')
+    formal_traditional=set().union(*to_traditional.values())
     for c,targets in to_simple.items():
         add('v2s',c,targets,'规范字表附表：繁体、异体到规范字')
         if coexist(c):hold('v2s',c,targets|{c},'两端均为规范字，需确认')
-        if c not in regular and c not in direct:
+        if c not in formal_traditional:
             possible=expand('v2t',set().union(*(to_traditional[t] or {t} for t in targets)))
             hold('v2t',c,possible,'具体繁体归属未核实，未机械展开候选')
     ts,risk=raw_table('TSCharacters.txt');st,_=raw_table('STCharacters.txt')
@@ -118,26 +84,16 @@ def compile_catalog(cache,output):
         if targets and (not edges['v2s'][c] or not targets<=edges['v2s'][c]):hold('v2s',c,targets,'OpenCC 补充关系尚待核查')
     for c,values in st.items():
         targets=expand('v2t',values)
-        corroborated={t for t in targets if t in regular and c in to_simple[t]}
-        if to_traditional[c]:corroborated &= expand('v2t',to_traditional[c])
-        if corroborated:add('v2t',c,corroborated,'OpenCC 与正式简体对应及中国台湾地区教育主管部门正字相符')
+        corroborated=targets & to_traditional[c]
+        if corroborated:add('v2t',c,corroborated,'OpenCC 与规范字表正式繁体对应相符')
         if not edges['v2t'][c] or not targets<=edges['v2t'][c]:hold('v2t',c,targets,'OpenCC 繁体补充或来源间差异，需确认')
     for c,origins in inferred.items():
-        targets=set(st.get(c,[]));uni={chr(int(v[2:],16)) for v in re.findall(r'U\+[0-9A-F]+',properties.get(c,{}).get('kTraditionalVariant',''))}
-        certain=targets&origins;conflict=bool(targets-origins) or bool(uni and not uni&targets)
-        if len(certain)==1 and not conflict and next(iter(certain)) in regular and c not in regular and c not in standard:
-            for o in edges:
-                accepted=expand(o,targets)
-                add(o,c,accepted,'稀有类推形反向；OpenCC 对应及中国台湾地区教育主管部门正字核对')
-                soft={'OpenCC 补充关系尚待核查','OpenCC 繁体补充或来源间差异，需确认'}
-                if pending[o][c]<=accepted and reasons[o][c]<=soft:pending[o][c].clear();reasons[o][c].clear()
-            if any(coexist(t) for t in targets):hold('v2s',c,expand('v2s',targets),'反向所归字繁简兼用，需确认')
-        else:
-            for o in edges:hold(o,c,expand(o,targets|origins),'反向关系多源、正字身份或来源存在分歧，需确认')
+        targets=set(st.get(c,[]))
+        for o in edges:hold(o,c,expand(o,targets|origins),'OpenCC 反向关系尚待独立核查')
     for c,properties_for_character in properties.items():
         targets={chr(int(v[2:],16)) for v in re.findall(r'U\+[0-9A-F]+',properties_for_character.get('kZVariant',''))}
         for t in targets:
-            if t in standard or t in regular:
+            if t in standard or t in formal_traditional:
                 for o in edges:
                     if not expand(o,{t})<=edges[o][c]:hold(o,c,expand(o,{t}),'Unicode 字形变体补充，待核规范字归属')
     output.mkdir(parents=True,exist_ok=True)
@@ -205,9 +161,9 @@ def compile_catalog(cache,output):
         (output/f'{o}.json').write_text('{\n'+body+'\n}\n',encoding='utf-8',newline='\n')
         counts[o]={'records':len(mapping),'pending':len(reviews[o]),'multi':sum(len(v)>1 for v in mapping.values())}
         if o!='common':counts[o]['effective_records']=len(mapping)+len(common)
-    summary={'scope':'单字字形；仅已核定候选参与转换；不确定的补充候选待核查；无词汇翻译','mainland_standard':8105,'formal_traditional':2574,'formal_variants':1023,'regular_source_records':len(regular_rows),'variant_source_records':len(relations),'unicode_relations':sum(bool(row['character'] and row['regular_character']) for row in relations),'unencoded_relations':sum(not row['character'] or not row['regular_character'] for row in relations),'counts':counts}
+    summary={'scope':'单字字形；仅已核定候选参与转换；不确定的补充候选待核查；无词汇翻译','mainland_standard':8105,'formal_traditional':2574,'formal_variants':1023,'counts':counts}
     (output/'reviews.json').write_text(json.dumps(reviews,ensure_ascii=False,separators=(',',':')),encoding='utf-8',newline='\n')
-    sources={'summary':summary,'links':{'mainland':'https://www.moe.gov.cn/jyb_xwfb/moe_2082/siju/yywzxxgls/ztzl_yywzgfbz/201306/t20130601_186002.html','variants':'https://dict.variants.moe.edu.tw/appendix.jsp?ID=3','unicode':'https://www.unicode.org/reports/tr38/','opencc':'https://github.com/BYVoid/OpenCC/tree/fae2a0a911c30764e669a7d8b0591cd8e852934a/data/dictionary'},'entries':source_index}
+    sources={'summary':summary,'links':{'mainland':'https://www.moe.gov.cn/jyb_xwfb/moe_2082/siju/yywzxxgls/ztzl_yywzgfbz/201306/t20130601_186002.html','unicode':'https://www.unicode.org/reports/tr38/','opencc':'https://github.com/BYVoid/OpenCC/tree/fae2a0a911c30764e669a7d8b0591cd8e852934a/data/dictionary'},'entries':source_index}
     (output/'sources.json').write_text(json.dumps(sources,ensure_ascii=False,separators=(',',':')),encoding='utf-8',newline='\n')
     print(json.dumps(summary,ensure_ascii=False,indent=2))
     return summary

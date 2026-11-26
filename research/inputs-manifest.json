@@ -7,16 +7,6 @@
       "sha256": "ae804ccde4dab4bc299a1712ac770519166143542001ca5bece543b47c3615ae",
       "bytes": 726207
     },
-    "moe-regular.json": {
-      "file": "moe-regular.json.gz",
-      "sha256": "3fe467493cdefb133bea7bcad0cd5d2cd67a6c98e9208e9508286e1b1bf2e743",
-      "bytes": 1423190
-    },
-    "moe-relations.json": {
-      "file": "moe-relations.json.gz",
-      "sha256": "def200fc72c4fafbbcdafd45e7971fa883cba5fe26f732a3b65a88a5dec0c21c",
-      "bytes": 8905021
-    },
     "sources/TGH-transcription.json": {
       "file": "TGH-transcription.json.gz",
       "sha256": "415d6cff85e758a45ee8e94e929a756793c90f9d7fd493a2a0c8b55ca7966dc8",
@@ -31,11 +21,6 @@
       "file": "STCharacters.txt.gz",
       "sha256": "a0ca1601c70648cf48b33c3c6210ccbecc5c7eead4b4c3daf76587ba2c03582b",
       "bytes": 36026
-    },
-    "sources/TWVariants.txt": {
-      "file": "TWVariants.txt.gz",
-      "sha256": "245b94eb5842957e735dd44b7e7d4ff469a3643126cc8fa511adda5281e9cb86",
-      "bytes": 978
     }
   }
 }

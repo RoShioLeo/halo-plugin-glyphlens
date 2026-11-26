@@ -3,6 +3,7 @@
 from pathlib import Path
 from collections import defaultdict
 import argparse,hashlib,json,re,unicodedata
+from reference_policy import select_reference
 
 def compile_catalog(cache,output):
     def read(name):return json.loads((cache/name).read_text(encoding='utf-8'))
@@ -96,6 +97,17 @@ def compile_catalog(cache,output):
             if t in standard or t in formal_traditional:
                 for o in edges:
                     if not expand(o,{t})<=edges[o][c]:hold(o,c,expand(o,{t}),'Unicode 字形变体补充，待核规范字归属')
+    # Existing sources own their mappings and candidate order. The reference
+    # may fill gaps only; excluded relations do not swell the review queue.
+    supplements,reference,reference_stats=select_reference(
+        read('moe-regular.json'),read('moe-relations.json'),simple_tiers,
+        formal_traditional,edges,pending,to_simple,ts)
+    for direction,entries in supplements.items():
+        for c,values in entries.items():
+            add(direction,c,values,'中国台湾地区教育主管部门异体资料：唯一常用对应，低优先级补充')
+            for url in reference['links'][c]:
+                item={'label':'中国台湾地区教育主管部门《異體字字典》：补充参考','url':url}
+                if item not in references[c]:references[c].append(item)
     output.mkdir(parents=True,exist_ok=True)
     reviews={};counts={};source_index={};mappings={}
     for o in edges:
@@ -104,7 +116,7 @@ def compile_catalog(cache,output):
             if not edges[o][c] and not pending[o][c]:continue
             if pending[o][c] - (edges[o][c] or {c}):
                 candidates=candidate_order(o,edges[o][c]|pending[o][c],c)
-                reviews[o][c]={'candidates':candidates,'reasons':sorted(reasons[o][c]),'evidence':sorted(proof[o][c]),'links':list(dict.fromkeys(item['url'] for item in references[c]))[:8]}
+                reviews[o][c]={'candidates':candidates,'reasons':sorted(reasons[o][c]),'evidence':sorted(proof[o][c]),'links':list(dict.fromkeys(item['url'] for item in references[c] if 'dict.variants.moe.edu.tw' not in item['url']))[:8]}
             # Known character relations remain usable; only unproved extra
             # candidates are withheld. Coexisting forms retain the input.
             if edges[o][c]:mapping[c]=candidate_order(o,edges[o][c],c)
@@ -161,10 +173,11 @@ def compile_catalog(cache,output):
         (output/f'{o}.json').write_text('{\n'+body+'\n}\n',encoding='utf-8',newline='\n')
         counts[o]={'records':len(mapping),'pending':len(reviews[o]),'multi':sum(len(v)>1 for v in mapping.values())}
         if o!='common':counts[o]['effective_records']=len(mapping)+len(common)
-    summary={'scope':'单字字形；仅已核定候选参与转换；不确定的补充候选待核查；无词汇翻译','mainland_standard':8105,'formal_traditional':2574,'formal_variants':1023,'counts':counts}
+    summary={'scope':'非常用异体字到常用字；现有来源优先；唯一常用参考对应自动补充','mainland_standard':8105,'formal_traditional':2574,'formal_variants':1023,'reference_policy':{'simple_max_level':2,'traditional_grades':['A','B'],'automatic':{o:len(v) for o,v in supplements.items()},'excluded':reference_stats},'counts':counts}
     (output/'reviews.json').write_text(json.dumps(reviews,ensure_ascii=False,separators=(',',':')),encoding='utf-8',newline='\n')
-    sources={'summary':summary,'links':{'mainland':'https://www.moe.gov.cn/jyb_xwfb/moe_2082/siju/yywzxxgls/ztzl_yywzgfbz/201306/t20130601_186002.html','unicode':'https://www.unicode.org/reports/tr38/','opencc':'https://github.com/BYVoid/OpenCC/tree/fae2a0a911c30764e669a7d8b0591cd8e852934a/data/dictionary'},'entries':source_index}
+    sources={'summary':summary,'links':{'mainland':'https://www.moe.gov.cn/jyb_xwfb/moe_2082/siju/yywzxxgls/ztzl_yywzgfbz/201306/t20130601_186002.html','unicode':'https://www.unicode.org/reports/tr38/','opencc':'https://github.com/BYVoid/OpenCC/tree/fae2a0a911c30764e669a7d8b0591cd8e852934a/data/dictionary','variants':'https://dict.variants.moe.edu.tw/'},'entries':source_index}
     (output/'sources.json').write_text(json.dumps(sources,ensure_ascii=False,separators=(',',':')),encoding='utf-8',newline='\n')
+    (output/'reference.json').write_text(json.dumps(reference,ensure_ascii=False,separators=(',',':')),encoding='utf-8',newline='\n')
     print(json.dumps(summary,ensure_ascii=False,indent=2))
     return summary
 

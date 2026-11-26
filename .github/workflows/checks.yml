@@ -26,6 +26,7 @@ jobs:
         run: node --test tests/*.test.mjs
       - name: Verify reproducible research inputs
         run: |
+          python scripts/test_reference_policy.py
           python scripts/restore_research.py
           python scripts/prepare_catalog.py --cache .research --output .research/rebuilt
           python scripts/verify_catalog.py --rebuilt .research/rebuilt

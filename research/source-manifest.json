@@ -52,5 +52,16 @@
       "date": "2015-09-23",
       "use": "unconfirmed transcription clues only"
     }
+  },
+  "variant-reference": {
+    "url": "https://dict.variants.moe.edu.tw/",
+    "name": "中国台湾地区教育主管部门《異體字字典》",
+    "snapshot_date": "2026-11-26",
+    "inputs": [
+      "moe-regular.json",
+      "moe-relations.json"
+    ],
+    "checksums": "inputs-manifest.json",
+    "use": "Low-priority unique common-target supplements and administrator-entered corroboration; protects standard and regular source characters; no new review queue."
   }
 }

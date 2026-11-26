@@ -21,6 +21,16 @@
       "file": "STCharacters.txt.gz",
       "sha256": "a0ca1601c70648cf48b33c3c6210ccbecc5c7eead4b4c3daf76587ba2c03582b",
       "bytes": 36026
+    },
+    "moe-regular.json": {
+      "file": "moe-regular.json.gz",
+      "sha256": "3fe467493cdefb133bea7bcad0cd5d2cd67a6c98e9208e9508286e1b1bf2e743",
+      "bytes": 1423190
+    },
+    "moe-relations.json": {
+      "file": "moe-relations.json.gz",
+      "sha256": "def200fc72c4fafbbcdafd45e7971fa883cba5fe26f732a3b65a88a5dec0c21c",
+      "bytes": 8905021
     }
   }
 }

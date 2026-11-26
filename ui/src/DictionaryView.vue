@@ -180,7 +180,7 @@ const formatCandidates = values => values?.length ? values.join(' / ') : '保持
 const pendingCandidates = row => row.pending ? row.reviewCandidates.filter(value => !row.candidates.includes(value)) : [];
 const rowStatus = mappingStatus;
 const rowStatusLabel = row => ({disabled:'停用',pending:'待审',enabled:'启用'})[rowStatus(row)];
-const rowSource = row => row.source === 'custom' || row.source === 'disabled' ? '自定义修正' : row.source === 'pending' ? '来源资料' : '基础字库';
+const rowSource = row => row.source === 'supplement' ? '基础补充' : row.source === 'custom' || row.source === 'disabled' ? '自定义修正' : row.source === 'pending' ? '来源资料' : '基础字库';
 const formatTime = value => value ? new Date(value).toLocaleString('zh-CN') : '初始修正';
 function openPublic() { window.open('/tools/glyphlens/', '_blank', 'noopener,noreferrer'); }
 function submitEditor() { document.getElementById('char-edit-form')?.requestSubmit(); }
@@ -293,6 +293,7 @@ async function showSources(row) {
                             <span>{{ row.direction==='v2s'?'转简体':'转繁体' }}</span>
                             <span>{{ row.character }} → {{ row.candidates.join(' / ') }}</span>
                             <small v-if="row.disabled">将启用</small><small v-else-if="row.reviewRequired">待确认</small>
+                            <small v-if="row.baseSupplement">基础补充</small>
                         </div>
                         <small>已有候选保留，新候选追加。</small>
                     </div>

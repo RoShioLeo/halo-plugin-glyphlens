@@ -13,9 +13,11 @@ import org.springframework.web.server.ResponseStatusException;
 @Component
 public final class GlyphCatalog {
     public record Review(List<String> candidates, List<String> reasons, List<String> evidence, List<String> links) {}
+    public record Reference(Map<String,Map<String,List<String>>> mappings, Map<String,List<String>> links) {}
     private final Map<String, Map<String, List<String>>> mappings;
     private final Map<String, Map<String, Review>> reviews;
     private volatile Map<String, Object> sources;
+    private volatile Reference reference;
 
     public GlyphCatalog() {
         var mapper = new ObjectMapper();
@@ -24,7 +26,25 @@ public final class GlyphCatalog {
         this.reviews = read(mapper, "data/reviews.json", new TypeReference<>() {});
     }
     GlyphCatalog(Map<String, Map<String, List<String>>> mappings, Map<String, Map<String, Review>> reviews) {
-        this.mappings = mappings; this.reviews = reviews; this.sources = Map.of();
+        this(mappings,reviews,new Reference(Map.of(),Map.of()));
+    }
+    GlyphCatalog(Map<String, Map<String, List<String>>> mappings, Map<String, Map<String, Review>> reviews, Reference reference) {
+        this.mappings = mappings; this.reviews = reviews; this.sources = Map.of();this.reference=reference;
+    }
+    private Reference reference() {
+        if(reference==null) synchronized(this) {
+            if(reference==null) reference=read(new ObjectMapper(),"data/reference.json",new TypeReference<>() {});
+        }
+        return reference;
+    }
+    boolean corroborates(String direction,String character,List<String> candidates) {
+        if(candidates==null || candidates.isEmpty()) return false;
+        if(direction.equals("common")) return corroborates("v2s",character,candidates) && corroborates("v2t",character,candidates);
+        return reference().mappings().getOrDefault(direction,Map.of()).getOrDefault(character,List.of()).containsAll(candidates);
+    }
+    List<Map<String,String>> referenceRecords(String character) {
+        return reference().links().getOrDefault(character,List.of()).stream().map(url->Map.of(
+            "label","中国台湾地区教育主管部门《異體字字典》：补充参考","url",url)).toList();
     }
     Map<String, List<String>> mapping(String direction) { validate(direction); return mappings.getOrDefault(direction, Map.of()); }
     Map<String, Review> reviews(String direction) { validate(direction); return reviews.getOrDefault(direction, Map.of()); }

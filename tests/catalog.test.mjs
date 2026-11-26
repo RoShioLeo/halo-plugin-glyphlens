@@ -45,15 +45,23 @@ test('remaining formal usage tiers rank candidates without the withdrawn grading
     assert.deepEqual(tc['台'],['台','檯','臺','颱']);
 });
 
-test('withdrawn-only relations are absent and unknown characters remain unchanged',()=>{
+test('protected original characters stay unchanged and reference never enters the review queue',()=>{
     for(const [direction,table] of [['v2s',simple],['v2t',traditional]]) {
         const converter=new GlyphConverter(direction,{...common,...table});
         assert.equal(converter.convert('㐺㐁〇𪷍'),'㐺㐁〇𪷍');
         for(const mode of ['common',direction])for(const source of ['㐺','㐁'])assert.equal(reviews[mode][source],undefined);
     }
     const sources=read('sources.json');
-    assert.deepEqual(Object.keys(sources.links).sort(),['mainland','opencc','unicode']);
-    for(const data of [sources,reviews])assert(!/moe\.edu\.tw|台湾|異體字字典/.test(JSON.stringify(data)));
+    assert.deepEqual(Object.keys(sources.links).sort(),['mainland','opencc','unicode','variants']);
+    assert(!/moe\.edu\.tw|台湾|異體字字典/.test(JSON.stringify(reviews)));
     const manifest=JSON.parse(fs.readFileSync(new URL('../research/inputs-manifest.json',import.meta.url),'utf8'));
-    assert.deepEqual(Object.keys(manifest.files).sort(),['properties.json','sources/STCharacters.txt','sources/TGH-transcription.json','sources/TSCharacters.txt']);
+    assert.deepEqual(Object.keys(manifest.files).sort(),['moe-regular.json','moe-relations.json','properties.json','sources/STCharacters.txt','sources/TGH-transcription.json','sources/TSCharacters.txt']);
+});
+
+test('unique common-target variants are active without approval while rare reverse targets stay excluded',()=>{
+    for(const [direction,table] of [['v2s',simple],['v2t',traditional]]) {
+        const converter=new GlyphConverter(direction,{...common,...table});
+        assert.equal(converter.convert('㐀㐅伱'),'丘五你');
+        for(const source of ['㐀','㐅','伱'])assert(!reviews.common[source] && !reviews[direction][source]);
+    }
 });

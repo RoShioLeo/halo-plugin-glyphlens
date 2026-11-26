@@ -108,6 +108,20 @@ def compile_catalog(cache,output):
             for url in reference['links'][c]:
                 item={'label':'中国台湾地区教育主管部门《異體字字典》：补充参考','url':url}
                 if item not in references[c]:references[c].append(item)
+    # A direct formal variant can be shared when its sole standard target has
+    # no different traditional spelling. Do not promote inferred, ambiguous or
+    # conflicting proposals, and never replace an existing traditional rule.
+    formal_variants=defaultdict(set)
+    for row in standards:
+        for item in row.get('v',[]):formal_variants[item['c']].add(row['c'])
+    for c,targets in formal_variants.items():
+        if len(targets)!=1 or edges['v2s'].get(c)!=targets or edges['v2t'].get(c):continue
+        if pending['v2s'].get(c,set())-targets or pending['v2t'].get(c,set())!=targets:continue
+        target=next(iter(targets))
+        unicode_traditional={chr(int(v[2:],16)) for v in re.findall(
+            r'U\+[0-9A-F]+',properties.get(target,{}).get('kTraditionalVariant',''))}
+        if to_traditional[target] or set(st.get(target,[target]))!={target} or unicode_traditional-{target}:continue
+        add('v2t',c,targets,'规范字表附表：异体对应唯一，目标繁简同形')
     output.mkdir(parents=True,exist_ok=True)
     reviews={};counts={};source_index={};mappings={}
     for o in edges:

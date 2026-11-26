@@ -6,6 +6,34 @@ const read=name=>JSON.parse(fs.readFileSync(new URL('../data/'+name,import.meta.
 const common=read('common.json'),simple=read('v2s.json'),traditional=read('v2t.json');
 const reviews=read('reviews.json');
 const scalar=value=>[...value].length===1 && !(value.codePointAt(0)>=0xD800&&value.codePointAt(0)<=0xDFFF);
+
+test('audited formal variants convert identically through common in both modes and directions',()=>{
+    const expected=JSON.parse(fs.readFileSync(new URL('./fixtures/formal-common.json',import.meta.url),'utf8'));
+    assert.equal(Object.keys(expected).length,249);
+    for(const [source,candidates] of Object.entries(expected)) {
+        assert.deepEqual(common[source],candidates,source);
+        assert(!Object.hasOwn(simple,source) && !Object.hasOwn(traditional,source),source);
+        for(const direction of ['common','v2s','v2t'])assert(!Object.hasOwn(reviews[direction],source),source);
+    }
+    const input=Object.keys(expected).join(''),output=Object.values(expected).flat().join('');
+    for(const [direction,table] of [['v2s',simple],['v2t',traditional]]) {
+        const converter=new GlyphConverter(direction,{...common,...table});
+        for(const mode of ['one2one','one2many'])assert.equal(converter.setMode(mode).convert(input),output);
+    }
+});
+
+test('formal common promotion does not turn directional or uncertain relations into shared rules',()=>{
+    const sc=new GlyphConverter('v2s',{...common,...simple});
+    const tc=new GlyphConverter('v2t',{...common,...traditional});
+    // Identity omission, different spellings, usage limits, ambiguity, and a
+    // pending variant whose target has a distinct traditional spelling.
+    for(const [source,s,t] of [['国','国','國'],['麁','粗','麤'],['冋','冋','坰'],
+                              ['尛','尛','麼'],['㕑','厨','㕑']]) {
+        assert(!Object.hasOwn(common,source),source);
+        assert.equal(sc.convert(source),s);assert.equal(tc.convert(source),t);
+    }
+    assert(reviews.v2t['㕑']);
+});
 test('all compiled records are single Unicode scalars and directional tables do not duplicate common',()=>{
     for(const dictionary of [common,simple,traditional])for(const [source,candidates]of Object.entries(dictionary)) {
         assert(scalar(source));assert(candidates.length>0);assert(candidates.every(scalar));assert.equal(new Set(candidates).size,candidates.length);

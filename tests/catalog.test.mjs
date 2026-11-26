@@ -28,3 +28,12 @@ test('screenshot sources no longer produce the rare inferred simplified targets'
     for(const [source,rejected]of [['㵾','𪷍'],['㶆','𫞛'],['㷍','𤆢'],['㷿','𤈷'],['㸇','𤎺']])assert(!(table[source]||[source]).includes(rejected));
     assert.deepEqual(table['𪷍'],['㵾']);
 });
+
+test('usage tiers put common candidates before rare forms without adding candidates',()=>{
+    const sc={...common,...simple},tc={...common,...traditional};
+    assert.deepEqual(sc['㐺'],['众','乑']);
+    assert.deepEqual(sc['㐁'],['西','㐁']);
+    assert.deepEqual(tc['㐁'],['西','㐁']);
+    assert.equal(sc['〇'][0],'〇');assert.equal(tc['〇'][0],'〇');
+    assert.deepEqual(tc['台'],['台','臺','颱','檯']);
+});

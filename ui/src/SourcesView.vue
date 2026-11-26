@@ -4,7 +4,7 @@ import { onMounted,ref } from 'vue';
 import { VCard,VButton,Toast } from '@halo-dev/components';
 import { request } from './api';
 const data=ref({summary:{},links:{}}),loading=ref(false);
-const labels={mainland:'通用规范汉字表',variants:'教育部异体字字典',unicode:'Unicode Unihan',opencc:'OpenCC 字符表'};
+const labels={mainland:'通用规范汉字表',variants:'中国台湾地区教育主管部门异体字字典',unicode:'Unicode Unihan',opencc:'OpenCC 字符表'};
 async function load(){loading.value=true;try{data.value=await request('/sources');}catch(error){Toast.error(error.message);}finally{loading.value=false;}}
 onMounted(load);
 </script>

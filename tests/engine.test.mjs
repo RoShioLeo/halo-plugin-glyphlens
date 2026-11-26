@@ -2,6 +2,26 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GlyphConverter } from '../web/engine.js';
 
+test('unmapped glyph sequences preserve their base, selectors and combining marks in both modes', () => {
+    const converter = new GlyphConverter('v2s', {'乾':['干'], '𠀀':['一'], e:['E'], '❤':['心'], '👩':['女']});
+    const sequences = ['乾\uFE00', '乾\u{E0100}', '𠀀\u{E01EF}', 'e\u0301', '❤️', '👩‍💻'];
+    for (const mode of ['one2one', 'one2many']) {
+        converter.setMode(mode);
+        for (const sequence of sequences) assert.equal(converter.convert(sequence + '乾'), sequence + '干');
+    }
+});
+
+test('lexicon cannot match through a protected glyph sequence or apply its choices to that glyph', () => {
+    const converter = new GlyphConverter('v2s', {'乾':['乾','干']}, [
+        {phrase:'乾燥', choices:[{offset:0,source:'乾',target:'干'}]},
+        {phrase:'水乾', choices:[{offset:1,source:'乾',target:'干'}]},
+    ]);
+    assert.equal(converter.convert('水乾\u{E0100}燥 乾燥'), '水乾\u{E0100}燥 干燥');
+    assert.equal(converter.convert('水\uFE00乾'), '水\uFE00【乾|干】');
+    converter.setMode('one2one');
+    assert.equal(converter.convert('水乾\u{E0100}燥 乾燥'), '水乾\u{E0100}燥 干燥');
+});
+
 test('both modes preserve candidate order and replace each original character only once', async () => {
     const converter = new GlyphConverter('v2t', {'发':['發','髮','發'], A:['B'], B:['C'], '𠀀':['一']});
     await converter.loaded;

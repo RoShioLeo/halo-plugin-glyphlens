@@ -35,6 +35,12 @@ export class DisambiguationIndex {
         let state = 0;
         for (let offset = 0; offset < characters.length; offset++) {
             const point = characters[offset].codePointAt(0);
+            // A multi-scalar glyph is not the plain character at its start and
+            // must not match a phrase or shift that phrase's scalar offsets.
+            if (characters[offset].length !== (point > 0xFFFF ? 2 : 1)) {
+                state = 0;
+                continue;
+            }
             while (state && !this.nodes[state].next.has(point)) state = this.nodes[state].fail;
             state = this.nodes[state].next.get(point) || 0;
             for (const index of this.nodes[state].outputs) {

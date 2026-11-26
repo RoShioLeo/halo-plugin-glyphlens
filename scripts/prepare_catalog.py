@@ -24,6 +24,20 @@ def compile_catalog(cache,output):
     assert sum(len(row.get('v',[])) for row in standards)==1023
     regular_rows=read('moe-regular.json');relations=read('moe-relations.json')
     regular={row['character'] for row in regular_rows if row['character']}
+    # Table serials and Unicode values are not frequency ranks. Use the
+    # published usage tiers; preserve the original only within the same tier.
+    simple_tiers={row['c']:row['lv'] for row in standards}
+    traditional_tiers={}
+    for row in regular_rows:
+        if row['character']:
+            tier={'A':1,'B':2,'C':3}.get(row['code'][:1],4)
+            traditional_tiers[row['character']]=min(tier,traditional_tiers.get(row['character'],4))
+    def candidate_order(direction,values,source):
+        tiers=simple_tiers if direction=='v2s' else traditional_tiers
+        # Ideographic zero is used independently as a numeral, outside these
+        # Han usage tables. An absent tier must not demote it to historical 星.
+        if source=='〇':return order(values,source)
+        return sorted(set(values),key=lambda c:(tiers.get(c,4),c!=source,ord(c)))
     direct=defaultdict(set);references=defaultdict(list)
     for row in regular_rows:
         if row['character']:references[row['character']].append({'label':row['code'],'url':f'https://dict.variants.moe.edu.tw/dictView.jsp?ID={row["id"]}'})
@@ -62,7 +76,7 @@ def compile_catalog(cache,output):
         if not han(s) or unicodedata.normalize('NFC',s)!=s:return
         pending[o][s].update(t for t in values if han(t) and unicodedata.normalize('NFC',t)==t);reasons[o][s].add(why)
     for c in regular:
-        add('v2t',c,{c},'教育部正字：保留原字')
+        add('v2t',c,{c},'中国台湾地区教育主管部门正字：保留原字')
         add('v2s',c,simple(c),'正字及规范字表简体对应')
         if coexist(c):hold('v2s',c,simple(c),'繁简均有独立用途，需确认')
     for row in standards:
@@ -85,7 +99,7 @@ def compile_catalog(cache,output):
                 if targets-traditional_targets-{c}:hold('v2t',c,targets-traditional_targets,'正式繁体表以外的补充归属，待核查')
             elif targets-{c}:hold('v2t',c,targets,'规范字的其他历史或地域归属，待核查')
         else:
-            add('v2t',c,targets,'教育部当前正异字关系');add('v2s',c,simpler,'教育部正异字关系及规范字表')
+            add('v2t',c,targets,'中国台湾地区教育主管部门当前正异字关系');add('v2s',c,simpler,'中国台湾地区教育主管部门正异字关系及规范字表')
         if c in regular or c in standard:
             for o in edges:hold(o,c,edges[o][c]|{c},'同时具正字身份，不能无条件归并')
         if any(coexist(t) for t in targets):hold('v2s',c,expand('v2s',targets),'所归正字繁简兼用，需先确认该关系')
@@ -106,7 +120,7 @@ def compile_catalog(cache,output):
         targets=expand('v2t',values)
         corroborated={t for t in targets if t in regular and c in to_simple[t]}
         if to_traditional[c]:corroborated &= expand('v2t',to_traditional[c])
-        if corroborated:add('v2t',c,corroborated,'OpenCC 与正式简体对应及教育部正字相符')
+        if corroborated:add('v2t',c,corroborated,'OpenCC 与正式简体对应及中国台湾地区教育主管部门正字相符')
         if not edges['v2t'][c] or not targets<=edges['v2t'][c]:hold('v2t',c,targets,'OpenCC 繁体补充或来源间差异，需确认')
     for c,origins in inferred.items():
         targets=set(st.get(c,[]));uni={chr(int(v[2:],16)) for v in re.findall(r'U\+[0-9A-F]+',properties.get(c,{}).get('kTraditionalVariant',''))}
@@ -114,7 +128,7 @@ def compile_catalog(cache,output):
         if len(certain)==1 and not conflict and next(iter(certain)) in regular and c not in regular and c not in standard:
             for o in edges:
                 accepted=expand(o,targets)
-                add(o,c,accepted,'稀有类推形反向；OpenCC 对应及教育部正字核对')
+                add(o,c,accepted,'稀有类推形反向；OpenCC 对应及中国台湾地区教育主管部门正字核对')
                 soft={'OpenCC 补充关系尚待核查','OpenCC 繁体补充或来源间差异，需确认'}
                 if pending[o][c]<=accepted and reasons[o][c]<=soft:pending[o][c].clear();reasons[o][c].clear()
             if any(coexist(t) for t in targets):hold('v2s',c,expand('v2s',targets),'反向所归字繁简兼用，需确认')
@@ -133,11 +147,11 @@ def compile_catalog(cache,output):
         for c in order(set(edges[o])|set(pending[o])):
             if not edges[o][c] and not pending[o][c]:continue
             if pending[o][c]:
-                candidates=order(edges[o][c]|pending[o][c],c)
+                candidates=candidate_order(o,edges[o][c]|pending[o][c],c)
                 reviews[o][c]={'candidates':candidates,'reasons':sorted(reasons[o][c]),'evidence':sorted(proof[o][c]),'links':list(dict.fromkeys(item['url'] for item in references[c]))[:8]}
             # Known character relations remain usable; only unproved extra
             # candidates are withheld. Coexisting forms retain the input.
-            if edges[o][c]:mapping[c]=order(edges[o][c],c)
+            if edges[o][c]:mapping[c]=candidate_order(o,edges[o][c],c)
             if references[c]:source_index[o][c]=references[c]
         mappings[o]=mapping
     # Canonical CJK compatibility aliases are explicit lookup entries. No

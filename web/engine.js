@@ -3,6 +3,7 @@ import { DisambiguationIndex } from './lexicon.js';
 
 const directions = new Set(['v2s', 'v2t']);
 const modes = new Set(['one2many', 'one2one']);
+const graphemes = new Intl.Segmenter('und', {granularity: 'grapheme'});
 const scalar = value => typeof value === 'string' && [...value].length === 1 &&
     !(value.codePointAt(0) >= 0xD800 && value.codePointAt(0) <= 0xDFFF);
 const json = url => fetch(url, {cache: 'no-store'}).then(response => {
@@ -53,13 +54,18 @@ export class GlyphConverter {
         if (typeof input !== 'string') throw new TypeError('请输入文本');
         const key = this.mode === 'one2many' ? 'many' : 'one';
         const output = [];
+        // The catalog only defines single scalars. Preserve entire unknown glyph
+        // sequences (IVS, combining marks, emoji) instead of changing their base.
+        const characters = Array.from(graphemes.segment(input), part => part.segment);
+        const entries = characters.map(character => scalar(character) ? this.entry(character) : undefined);
         if (!this.lexicon.rules.length) {
-            for (const character of input) output.push(this.entry(character)?.[key] ?? character);
-        } else {
-            const characters = Array.from(input);
-            const decisions = this.lexicon.resolve(characters, position => this.entry(characters[position])?.candidates);
             for (let position = 0; position < characters.length; position++) {
-                const character = characters[position], entry = this.entry(character), selected = decisions.get(position)?.values;
+                output.push(entries[position]?.[key] ?? characters[position]);
+            }
+        } else {
+            const decisions = this.lexicon.resolve(characters, position => entries[position]?.candidates);
+            for (let position = 0; position < characters.length; position++) {
+                const character = characters[position], entry = entries[position], selected = decisions.get(position)?.values;
                 if (selected?.size === 1) output.push(selected.values().next().value);
                 else if (selected?.size > 1 && key === 'many') {
                     const candidates = entry.candidates.filter(candidate => selected.has(candidate));

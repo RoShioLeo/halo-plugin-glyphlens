@@ -2,7 +2,7 @@
 
 ## 当前范围
 
-插件 ID `lemonslice-glyphlens`，版本保持 **0.1.1**。用户要求直接覆盖当前版本，源码、发布附件和线上安装包需保持一致。前台 `/tools/glyphlens/`，后台 `/console/glyphlens-dictionary`。
+插件 ID `lemonslice-glyphlens`，当前版本 **0.1.2**。源码、发布附件和线上安装包需保持一致。前台 `/tools/glyphlens/`，后台 `/console/glyphlens-dictionary`。
 
 ## 数据与转换
 
@@ -26,7 +26,7 @@
 - 现有新版自定义、词典和反馈应保留。配置名为 `lemonslice-glyphlens-dictionaries`、`lemonslice-glyphlens-lexicon`、`lemonslice-glyphlens-feedback`。
 - 不改文章、主题、私厨或 LensMD。
 - 本地实例为 `127.0.0.1:8092`，仅在确认 PID、启动时间和可执行文件一致后重启。
-- Java 21、Node 24；本机缓存 Gradle 9.4.1，仓库 Wrapper 9.4.0。构建输出 `build/libs/GlyphLens-0.1.1.jar`。
+- Java 21、Node 24；本机缓存 Gradle 9.4.1，仓库 Wrapper 9.4.0。构建输出 `build/libs/GlyphLens-0.1.2.jar`。
 - 必须验证干净输入可复现、Node/Java 测试、公开字库及后台资源哈希。相同版本号覆盖时不能仅凭版本号判定新包已加载。
 
 ## 本次覆盖验证（2026-11-26）
@@ -46,3 +46,9 @@
 - Node 15 项、Java 17 项通过；本地 HTTP 验证双方向、只填简体、只填繁体、全空拒绝和错误请求不部分写入，测试数据已恢复。
 - 线上保持 0.1.1，已验证新接口、匿名访问限制、版本冲突保护及后台 JS/CSS 哈希；公开转换数据未改动。本次浏览器检查超时，未完成修复后的视觉验收。
 - 最新安装包 SHA-256：`13179ED5BEF19CB71D606D686ACF1D0066E442A9EE6D0FC595BD14015F75DACE`。
+
+## 0.1.2 发布（2026-11-27）
+
+按用户最终指定版本发布 0.1.2，包含上述新增映射入口及候选表单对齐修复；不更改字库内容和保存规则。0.1.1 段落保留为已执行的部署记录。
+
+0.1.2 已部署并通过版本、接口与资源哈希校验；安装包 SHA-256：`504CDE6A40634B8638868630E0A427BDBA7C07629BB0CFC7DECADBCD7738C92B`。

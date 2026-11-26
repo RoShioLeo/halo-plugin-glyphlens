@@ -2,12 +2,12 @@
 
 ## 当前范围
 
-插件 ID `lemonslice-glyphlens`，当前版本 **0.1.3**。源码、发布附件和线上安装包需保持一致。前台 `/tools/glyphlens/`，后台 `/console/glyphlens-dictionary`。
+插件 ID `lemonslice-glyphlens`，当前版本 **0.1.4**。源码、发布附件和线上安装包需保持一致。前台 `/tools/glyphlens/`，后台 `/console/glyphlens-dictionary`。
 
 ## 数据与转换
 
 - 优先使用《通用规范汉字表》及附表、Unicode Unihan、OpenCC 通用 TS/ST 字符表。0.1.3 按用户新要求恢复经筛选的中国台湾地区教育主管部门《異體字字典》补充参考；不得恢复旧的全量自动映射。
-- 当前从六份事实输入重建，参考字典只补充非正字到唯一常用目标，排除项不进入待审。可复现步骤及收录政策见 README。
+- 当前从六份事实输入重建，参考字典只补充非正字到唯一常用目标，排除项不进入待审。可复现步骤见 README，收录政策见 [字库说明](DICTIONARY.md)。
 - 通用表作为基础，方向表的启用规则覆盖通用规则；方向停用回退通用，无可用映射则保留原字。列表和导出仅含所选表。
 - 不保存只有自身的基础映射；合法多候选中的原字可保留。默认取首选，多字模式展示全部候选；方向排序取规范字等级，同级原字优先，之后码点稳定排序。
 - 未核实的补充候选不自动启用。来源撤下会减少覆盖范围，不以猜测补齐；未命中字与多码点字形保持原文。
@@ -26,7 +26,7 @@
 - 现有新版自定义、词典和反馈应保留。配置名为 `lemonslice-glyphlens-dictionaries`、`lemonslice-glyphlens-lexicon`、`lemonslice-glyphlens-feedback`。
 - 不改文章、主题、私厨或 LensMD。
 - 本地实例为 `127.0.0.1:8092`，仅在确认 PID、启动时间和可执行文件一致后重启。
-- Java 21、Node 24；本机缓存 Gradle 9.4.1，仓库 Wrapper 9.4.0。构建输出 `build/libs/GlyphLens-0.1.3.jar`。
+- Java 21、Node 24；本机缓存 Gradle 9.4.1，仓库 Wrapper 9.4.0。构建输出 `build/libs/GlyphLens-0.1.4.jar`。
 - 必须验证干净输入可复现、Node/Java 测试、公开字库及后台资源哈希。相同版本号覆盖时不能仅凭版本号判定新包已加载。
 
 ## 本次覆盖验证（2026-11-26）

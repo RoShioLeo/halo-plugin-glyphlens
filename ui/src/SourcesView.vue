@@ -21,10 +21,5 @@ onMounted(load);
         <h3>《通用规范汉字表》原始资料</h3>
         <p>规范字 {{formatCount(data.summary.mainland_standard)}} 个 · 附表繁体对应 {{formatCount(data.summary.formal_traditional)}} 条 · 附表异体对应 {{formatCount(data.summary.formal_variants)}} 条</p>
     </section>
-    <section v-if="data.summary.reference_policy" class="counts">
-        <h3>如何补充异体字</h3>
-        <p>只补充字库里缺少的对应，不改动已有规则。一个异体字只有一种明确对应，且对应的字在收录范围内，才会自动加入。</p>
-        <p>收录范围：简体一级、二级字；繁体常用、次常用字。已经是规范写法的字，不会因为参考资料里存在其他写法就被替换。</p>
-    </section>
 </VCard></template>
 <style scoped>.head{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}p{margin:8px 0;font-size:14px;line-height:1.7}a{color:#8b6a17;text-decoration:underline}.counts{margin-top:24px}.counts h3{margin:0;font-size:14px;font-weight:600}.muted{opacity:.7}</style>

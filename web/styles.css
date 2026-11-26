@@ -61,6 +61,9 @@ button:disabled { cursor: default; opacity: .45; }
 main { flex: 1; padding-bottom: 32px; }
 .brand { display: flex; align-items: center; gap: 16px; padding: 32px 0; }
 .brand img { flex: none; }
+.brand-logo-dark { display: none; }
+html[data-color-scheme="dark"] .brand-logo-light { display: none; }
+html[data-color-scheme="dark"] .brand-logo-dark { display: block; }
 .brand-kicker { margin: 0; color: var(--accent); font-size: 10px; font-weight: 600; line-height: 1.6; letter-spacing: .1em; }
 h1 { margin: 4px 0 0; font-size: 28px; font-weight: 700; line-height: 1.25; letter-spacing: normal; }
 .controls { display: flex; align-items: end; flex-wrap: wrap; gap: 16px; margin-bottom: 32px; }

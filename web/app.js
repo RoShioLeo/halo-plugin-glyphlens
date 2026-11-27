@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: MIT
 import { GlyphConverter } from './engine.js';
+import { ReviewView } from './review-view.js';
 const converters = new Map();
 const element = id => document.getElementById(id);
+const selected = name => [...document.getElementsByName(name)].find(input => input.checked).value;
+const isReviewMode = () => selected('mode') === 'one2many';
+let result = null, revision = 0, operations = 0, outputFilename = '字镜-转换结果.txt';
 const status = (message, error = false) => {
     element('conversionStatus').textContent = message;
     element('conversionStatus').dataset.error = String(error);
@@ -13,8 +17,37 @@ fetch('access', {credentials: 'same-origin', cache: 'no-store'})
     .catch(() => { element('dictionaryAdmin').hidden = true; });
 window.addEventListener('focus', () => converters.clear());
 
-async function currentConverter() {
-    const option = element('optionSelect').value;
+const review = new ReviewView({
+    panel: element('reviewPanel'), text: element('reviewText'), status: element('reviewStatus'),
+    previous: element('previousCandidate'), next: element('nextCandidate'), picker: element('candidatePicker'),
+    source: element('candidateSource'), choices: element('candidateChoices'),
+}, document => { if (result === document) { renderOutput(); status(''); } });
+
+function renderOutput() {
+    const text = result?.text() ?? '';
+    element('outputText').value = text;
+    element('copyOutput').disabled = element('downloadOutput').disabled = !text;
+    element('outputText').hidden = !!result && isReviewMode();
+    element('outputLabel').textContent = result && isReviewMode() ? '校对结果' : '转换结果';
+    if (result && isReviewMode()) review.show(result);
+    else element('reviewPanel').hidden = true;
+}
+
+function invalidate() {
+    revision++;
+    result = null;
+    review.clear();
+    renderOutput();
+    status('');
+}
+
+function updateFileControls() {
+    element('convertText').disabled = operations > 0;
+    element('convertFile').disabled = operations > 0 || !element('fileInput').files[0];
+    element('convertFile').textContent = isReviewMode() ? '转换文件' : '转换并下载';
+}
+
+async function currentConverter(option) {
     if (!converters.has(option)) {
         const converter = new GlyphConverter(option);
         converters.set(option, converter);
@@ -26,66 +59,110 @@ async function currentConverter() {
         converters.delete(option);
         throw error;
     }
-    converter.setMode(element('modeSelect').value);
     return converter;
 }
 
-async function runConversion(button, action) {
-    button.disabled = true;
+async function runConversion(action) {
+    const token = ++revision;
+    operations++;
+    updateFileControls();
     status('');
-    try { await action(); }
-    catch (_) { status('转换失败，请检查网络或文本文件后重试。', true); }
-    finally { button.disabled = false; }
+    try { await action(token); }
+    catch (_) { if (token === revision) status('转换失败，请检查网络或文本文件后重试。', true); }
+    finally { operations--; updateFileControls(); }
 }
 
-element('convertText').addEventListener('click', event => runConversion(event.currentTarget, async () => {
-    const converter = await currentConverter();
-    element('outputText').value = converter.convert(element('inputText').value);
-    element('copyOutput').disabled = !element('outputText').value;
+async function convertInput(token) {
+    const input = element('inputText').value, direction = selected('direction');
+    const converter = await currentConverter(direction);
+    if (token !== revision || input !== element('inputText').value || direction !== selected('direction')) return;
+    result = converter.review(input);
+    outputFilename = '字镜-转换结果.txt';
+    renderOutput();
+}
+
+element('convertText').addEventListener('click', () => runConversion(convertInput));
+element('inputText').addEventListener('input', invalidate);
+document.querySelectorAll('input[name="direction"]').forEach(input => input.addEventListener('change', () => {
+    const hadResult = !!result;
+    invalidate();
+    if (hadResult) runConversion(convertInput);
+}));
+document.querySelectorAll('input[name="mode"]').forEach(input => input.addEventListener('change', () => {
+    revision++;
+    renderOutput();
+    updateFileControls();
+    status('');
 }));
 
 element('clearText').addEventListener('click', () => {
     element('inputText').value = '';
-    element('outputText').value = '';
-    element('copyOutput').disabled = true;
-    status('');
+    invalidate();
     element('inputText').focus();
 });
 
 element('copyOutput').addEventListener('click', async () => {
-    if (!element('outputText').value) return;
+    if (!result?.text()) return;
+    const copied = result.text(), copiedDocument = result;
+    const copiedMessage = () => result === copiedDocument && result.text() === copied ? status(exportMessage('已复制')) : undefined;
     try {
-        await navigator.clipboard.writeText(element('outputText').value);
-        status('已复制');
+        await navigator.clipboard.writeText(copied);
+        copiedMessage();
     } catch (_) {
-        element('outputText').focus();
-        element('outputText').select();
-        status(document.execCommand('copy') ? '已复制' : '请复制已选中的文字。');
+        const temporary = window.document.createElement('textarea'), previous = window.document.activeElement;
+        temporary.value = copied;
+        temporary.className = 'visually-hidden';
+        temporary.style.minHeight = '0';
+        window.document.body.append(temporary);
+        temporary.focus({preventScroll: true});
+        temporary.select();
+        let success = false;
+        try { success = window.document.execCommand('copy'); }
+        finally { temporary.remove(); previous?.focus({preventScroll: true}); }
+        if (success) copiedMessage();
+        else status('请选中结果文字后复制。', true);
     }
 });
 
-element('chooseFile').addEventListener('click', () => element('fileInput').click());
-element('fileInput').addEventListener('change', () => {
-    const file = element('fileInput').files[0];
-    element('convertFile').disabled = !file;
-    status(file ? file.name : '');
-});
-element('convertFile').addEventListener('click', event => runConversion(event.currentTarget, async () => {
-    const file = element('fileInput').files[0];
-    if (!file) return;
-    const converter = await currentConverter();
-    const text = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer());
-    const converted = converter.convert(text);
-    const url = URL.createObjectURL(new Blob([converted], { type: 'text/plain;charset=utf-8' }));
+function exportMessage(message) {
+    return isReviewMode() && result?.pending ? `${message}，剩余 ${result.pending} 处采用默认字形` : message;
+}
+
+function downloadResult() {
+    if (!result?.text()) return;
+    const url = URL.createObjectURL(new Blob([result.text()], { type: 'text/plain;charset=utf-8' }));
     const link = document.createElement('a');
     link.href = url;
-    link.download = file.name.replace(/\.[^.]+$/, '') + '-转换结果.txt';
+    link.download = outputFilename;
     document.body.append(link);
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    status('文件已转换');
+    status(exportMessage('已下载'));
+}
+element('downloadOutput').addEventListener('click', downloadResult);
+element('chooseFile').addEventListener('click', () => element('fileInput').click());
+element('fileInput').addEventListener('change', () => {
+    const file = element('fileInput').files[0];
+    invalidate();
+    updateFileControls();
+    status(file ? file.name : '');
+});
+element('convertFile').addEventListener('click', () => runConversion(async token => {
+    const file = element('fileInput').files[0];
+    if (!file) return;
+    const direction = selected('direction');
+    const [converter, bytes] = await Promise.all([currentConverter(direction), file.arrayBuffer()]);
+    if (token !== revision || direction !== selected('direction') || file !== element('fileInput').files[0]) return;
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    element('inputText').value = text;
+    result = converter.review(text);
+    outputFilename = file.name.replace(/\.[^.]+$/, '') + '-转换结果.txt';
+    renderOutput();
+    if (!isReviewMode()) downloadResult();
+    else status('文件已载入');
 }));
+updateFileControls();
 
 function feedbackCharacter(input, optional = false) {
     let value = input.trim();
@@ -102,9 +179,9 @@ function feedbackCharacter(input, optional = false) {
 }
 element('openFeedback').addEventListener('click', () => {
     element('feedbackForm').reset();element('feedbackStatus').textContent = '';element('feedbackCode').textContent = '';
-    const input = element('inputText'), selected = input.value.slice(input.selectionStart, input.selectionEnd);
-    if ([...selected].length === 1) element('feedbackCharacter').value = selected;
-    element('feedbackDirection').value = element('optionSelect').value;
+    const input = element('inputText'), selectedText = input.value.slice(input.selectionStart, input.selectionEnd);
+    if ([...selectedText].length === 1) element('feedbackCharacter').value = selectedText;
+    element('feedbackDirection').value = selected('direction');
     element('feedbackDialog').showModal();element('feedbackCharacter').focus();
 });
 element('cancelFeedback').addEventListener('click', () => element('feedbackDialog').close());

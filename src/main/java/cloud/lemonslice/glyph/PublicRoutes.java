@@ -20,7 +20,7 @@ import reactor.core.publisher.Mono;
 
 @Component
 public final class PublicRoutes {
-    private static final Set<String> FILES=Set.of("index.html","styles.css","app.js","engine.js","lexicon.js","appearance.js","img/lemon.svg","img/glyphlens.svg","img/glyphlens-dark.svg","LICENSE","NOTICE.md");
+    private static final Set<String> FILES=Set.of("index.html","styles.css","app.js","engine.js","lexicon.js","review-document.js","review-view.js","appearance.js","img/lemon.svg","img/glyphlens.svg","img/glyphlens-dark.svg","LICENSE","NOTICE.md");
     private final GlyphStore glyphs;
     private final LexiconStore lexicon;
     private final FeedbackStore feedback;

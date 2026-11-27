@@ -57,6 +57,7 @@ test('the twelve explicitly requested vertical punctuation pairs work in both di
 test('documented multiple forms remain usable with original-first coexisting characters',()=>{
     const sc=new GlyphConverter('v2s',{...common,...simple});
     const tc=new GlyphConverter('v2t',{...common,...traditional});
+    sc.setMode('one2many');tc.setMode('one2many');
     assert.equal(sc.convert('乾'),'【乾|干】');assert.equal(tc.convert('干'),'【干|乾|幹】');assert.equal(tc.convert('发'),'【發|髮】');
     sc.setMode('one2one');tc.setMode('one2one');assert.equal(sc.convert('乾'),'乾');assert.equal(tc.convert('干'),'干');
 });

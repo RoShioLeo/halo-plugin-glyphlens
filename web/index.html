@@ -44,20 +44,26 @@
                 </div>
             </div>
             <div class="controls">
-                <div class="field">
-                    <label for="optionSelect">转换目标</label>
-                    <select id="optionSelect">
-                        <option value="v2s">简体字</option>
-                        <option value="v2t">繁体字</option>
-                    </select>
-                </div>
-                <div class="field">
-                    <label for="modeSelect">转换方式</label>
-                    <select id="modeSelect">
-                        <option value="one2one">默认转换</option>
-                        <option value="one2many" selected>多字候选</option>
-                    </select>
-                </div>
+                <fieldset class="field">
+                    <legend>转换目标</legend>
+                    <div class="segmented">
+                        <input type="radio" name="direction" id="targetSimplified" value="v2s" checked>
+                        <label for="targetSimplified">简体字</label>
+                        <input type="radio" name="direction" id="targetTraditional" value="v2t">
+                        <label for="targetTraditional">繁体字</label>
+                        <span class="segmented-thumb" aria-hidden="true"></span>
+                    </div>
+                </fieldset>
+                <fieldset class="field">
+                    <legend>转换方式</legend>
+                    <div class="segmented">
+                        <input type="radio" name="mode" id="modeDefault" value="one2one" checked>
+                        <label for="modeDefault">默认转换</label>
+                        <input type="radio" name="mode" id="modeCandidates" value="one2many">
+                        <label for="modeCandidates">多字候选</label>
+                        <span class="segmented-thumb" aria-hidden="true"></span>
+                    </div>
+                </fieldset>
                 <div class="file-actions">
                     <input type="file" id="fileInput" accept=".txt,text/plain" class="visually-hidden">
                     <button type="button" id="chooseFile">选择文件</button>
@@ -77,10 +83,28 @@
                 </section>
                 <section class="text-panel">
                     <div class="panel-heading">
-                        <label for="outputText">转换结果</label>
-                        <button type="button" id="copyOutput" class="quiet-button" disabled>复制结果</button>
+                        <span id="outputLabel">转换结果</span>
+                        <div class="panel-actions">
+                            <button type="button" id="copyOutput" class="quiet-button" disabled>复制</button>
+                            <button type="button" id="downloadOutput" class="quiet-button" disabled>下载</button>
+                        </div>
                     </div>
-                    <textarea id="outputText" rows="13" spellcheck="false" readonly></textarea>
+                    <textarea id="outputText" rows="13" spellcheck="false" readonly aria-labelledby="outputLabel"></textarea>
+                    <div id="reviewPanel" class="review-shell" hidden>
+                        <div class="review-toolbar">
+                            <span id="reviewStatus" role="status" aria-live="polite"></span>
+                            <div class="review-navigation">
+                                <button type="button" id="previousCandidate" class="quiet-button">上一处</button>
+                                <button type="button" id="nextCandidate" class="quiet-button">下一处</button>
+                            </div>
+                        </div>
+                        <div id="candidatePicker" class="candidate-picker" hidden>
+                            <span id="candidateSource" class="candidate-source"></span>
+                            <div id="candidateChoices" class="candidate-choices" role="group" aria-label="字形候选" aria-describedby="candidateKeyboardHelp"></div>
+                            <span id="candidateKeyboardHelp" class="visually-hidden">数字键 1 至 9 选择候选；方向键跳转，Esc 关闭候选。</span>
+                        </div>
+                        <div id="reviewText" class="review-text" role="region" aria-labelledby="outputLabel"></div>
+                    </div>
                 </section>
             </div>
             <div class="bottom-actions">

@@ -22,6 +22,8 @@ jobs:
         with:
           version: 12.16.1
           package_json_file: ui/package.json
+      - name: Install UI and DOM test dependencies
+        run: pnpm --dir ui install --frozen-lockfile
       - name: Test conversion and compiled data
         run: node --test tests/*.test.mjs
       - name: Verify reproducible research inputs

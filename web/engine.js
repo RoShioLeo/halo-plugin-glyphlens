@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 import { DisambiguationIndex } from './lexicon.js';
+import { ReviewDocument } from './review-document.js';
 
 const directions = new Set(['v2s', 'v2t']);
 const modes = new Set(['one2many', 'one2one']);
@@ -15,7 +16,7 @@ export class GlyphConverter {
     constructor(direction = 'v2s', dictionary, lexicon = []) {
         if (!directions.has(direction)) throw new TypeError('未知转换方向');
         this.direction = direction;
-        this.mode = 'one2many';
+        this.mode = 'one2one';
         this.main = new Uint32Array(0xA000 - 0x3400);
         this.extension = new Uint32Array(0x33480 - 0x20000);
         this.other = new Map();
@@ -50,29 +51,44 @@ export class GlyphConverter {
     setMode(mode) {
         if (!modes.has(mode)) throw new TypeError('未知候选模式');this.mode = mode;return this;
     }
-    convert(input) {
+    plan(input) {
         if (typeof input !== 'string') throw new TypeError('请输入文本');
-        const key = this.mode === 'one2many' ? 'many' : 'one';
-        const output = [];
         // The catalog only defines single scalars. Preserve entire unknown glyph
         // sequences (IVS, combining marks, emoji) instead of changing their base.
         const characters = Array.from(graphemes.segment(input), part => part.segment);
         const entries = characters.map(character => scalar(character) ? this.entry(character) : undefined);
-        if (!this.lexicon.rules.length) {
-            for (let position = 0; position < characters.length; position++) {
-                output.push(entries[position]?.[key] ?? characters[position]);
-            }
-        } else {
-            const decisions = this.lexicon.resolve(characters, position => entries[position]?.candidates);
-            for (let position = 0; position < characters.length; position++) {
-                const character = characters[position], entry = entries[position], selected = decisions.get(position)?.values;
-                if (selected?.size === 1) output.push(selected.values().next().value);
-                else if (selected?.size > 1 && key === 'many') {
-                    const candidates = entry.candidates.filter(candidate => selected.has(candidate));
-                    output.push(`【${candidates.join('|')}】`);
-                } else output.push(entry?.[key] ?? character);
+        const decisions = this.lexicon.rules.length ?
+            this.lexicon.resolve(characters, position => entries[position]?.candidates) : new Map();
+        return {characters, entries, decisions};
+    }
+    candidates(plan, position) {
+        const values = plan.entries[position]?.candidates ?? [plan.characters[position]];
+        const selected = plan.decisions.get(position)?.values;
+        return selected?.size ? values.filter(value => selected.has(value)) : values;
+    }
+    convert(input) {
+        const plan = this.plan(input), output = [], key = this.mode === 'one2many' ? 'many' : 'one';
+        for (let position = 0; position < plan.characters.length; position++) {
+            if (!plan.decisions.has(position)) output.push(plan.entries[position]?.[key] ?? plan.characters[position]);
+            else {
+                const values = this.candidates(plan, position);
+                output.push(key === 'many' && values.length > 1 ? `【${values.join('|')}】` : values[0]);
             }
         }
         return output.join('');
+    }
+    review(input) {
+        const plan = this.plan(input), parts = [];
+        let text = [];
+        for (let position = 0; position < plan.characters.length; position++) {
+            const candidates = this.candidates(plan, position);
+            if (candidates.length === 1) text.push(candidates[0]);
+            else {
+                if (text.length) { parts.push(text.join('')); text = []; }
+                parts.push({source: plan.characters[position], candidates});
+            }
+        }
+        if (text.length) parts.push(text.join(''));
+        return new ReviewDocument(parts);
     }
 }

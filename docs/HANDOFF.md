@@ -1,12 +1,12 @@
 # 字镜开发与发布接续说明
 
-当前插件版本 **0.2.3**，默认字库版本 **1.0.0**，插件 ID `lemonslice-glyphlens`。前台 `/tools/glyphlens/`，后台 `/console/glyphlens-dictionary`。
+当前插件版本 **0.2.4**，默认字库版本 **1.0.0**，插件 ID `lemonslice-glyphlens`。前台 `/tools/glyphlens/`，后台 `/console/glyphlens-dictionary`。
 
 发布与安装使用当前提交的 GitHub CI 产物，核对 JAR、独立字库及校验清单一致后，通过常规插件升级安装。
 
 本地来源索引仅保留实际字形替换的原始资料与归并路径，移除自保留候选的来源记录和重复确认索引。独立的同码位原字映射不收录；合法多候选里的原字、不同 Unicode 码位的规范合一映射保留。默认字库只收确定关系。
 
-README 与后台来源表仅保留“来源 / 收录字数 / 映射条数”三列；手动维护不逐字列举，去掉出处待核和审核说明。公开介绍保持简洁。前台文件导入、示例、模式记忆和校对交互沿用已实现的行为；页脚明确显示“插件 v0.2.3 · 字库 v1.0.0”。
+README 与后台来源表仅保留“来源 / 收录字数 / 映射条数”三列；手动维护不逐字列举，去掉出处待核和审核说明。公开介绍保持简洁。前台文件导入、示例、模式记忆和校对交互沿用已实现的行为；页脚明确显示“插件 v0.2.4 · 字库 v1.0.0”。
 
 ## 当前范围
 
@@ -42,4 +42,4 @@ README 与后台来源表仅保留“来源 / 收录字数 / 映射条数”三�
 
 不改文章、主题、私厨或 LensMD。GitHub 源码、Release 附件及服务器安装包需一致。
 
-Java 21、Node 24，Gradle Wrapper 9.4.0。构建 `./gradlew build --no-daemon --console=plain`，产物 `build/libs/GlyphLens-0.2.3.jar`。验证 Node/DOM、Python 策略、Java 权限/存储测试、可复现数据和来源统计；升级后核对默认字库、消歧规则、资源保留和前后台资源哈希。
+Java 21、Node 24，Gradle Wrapper 9.4.0。构建 `./gradlew build --no-daemon --console=plain`，产物 `build/libs/GlyphLens-0.2.4.jar`。Halo 会省略空的配置版本字段；首次导入时应省略查询参数 version，已有版本为 0 时仍须传递。验证 Node/DOM、Python 策略、Java 权限/存储测试、可复现数据和来源统计；升级后核对默认字库、消歧规则、资源保留和前后台资源哈希。

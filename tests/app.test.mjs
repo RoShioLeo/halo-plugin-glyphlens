@@ -139,7 +139,7 @@ test('invalid saved modes fall back to default conversion', async t => {
 
 test('the footer shows independent installed dictionary and plugin versions', async t => {
     const {get}=await fixture(t,{dictionaryVersion:'1.2.3'});await pause(0);
-    assert.equal(get('dictionaryVersion').textContent,'v1.2.3');assert.equal(get('appVersion').textContent,'v0.2.3');
+    assert.equal(get('dictionaryVersion').textContent,'v1.2.3');assert.equal(get('appVersion').textContent,'v0.2.4');
 });
 
 test('unavailable storage does not prevent conversion or mode switching', async t => {

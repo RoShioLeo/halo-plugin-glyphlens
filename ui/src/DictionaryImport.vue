@@ -4,6 +4,7 @@ import { computed,ref } from 'vue';
 import { Toast,VButton,VModal,VLoading } from '@halo-dev/components';
 import { request } from './api';
 import { unicodeCodes } from './unicode';
+import { dictionaryImportQuery } from './dictionary-import.js';
 const props=defineProps({visible:Boolean});
 const emit=defineEmits(['close','saved']);
 const file=ref(null),preview=ref(null),busy=ref(false),error=ref(''),confirmed=ref(false),page=ref(1);
@@ -25,8 +26,7 @@ async function inspectFile() {
 async function save() {
     if(!file.value || !preview.value || !confirmed.value || busy.value)return;
     busy.value=true;error.value='';
-    const params=new URLSearchParams({fileHash:preview.value.fileHash,confirmed:'true'});
-    if(preview.value.stateVersion!==null)params.set('version',String(preview.value.stateVersion));
+    const params=dictionaryImportQuery(preview.value);
     try {
         await request('/dictionary/import?'+params,{method:'PUT',headers:{'Content-Type':'application/octet-stream'},body:file.value});
         Toast.success('字库已导入');emit('saved');busy.value=false;close();

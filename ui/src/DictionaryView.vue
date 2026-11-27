@@ -14,7 +14,7 @@ const section=ref('glyphs'),query=ref(''),source=ref('all'),page=ref(1);
 const result=ref({items:[],total:0,version:null,effectiveCount:0,changedCount:0});
 const loading=ref(false),saving=ref(false),selected=ref([]),error=ref('');
 const editorVisible=ref(false),historyVisible=ref(false),history=ref([]),sourceVisible=ref(false),sourceRecords=ref([]);
-const sourceCharacter=ref(''),sourceConfirmation=ref({});
+const sourceCharacter=ref('');
 const importVisible=ref(false),dictionaryRevision=ref(0);
 function imported(){dictionaryRevision.value++;load();}
 const sourceGroups=computed(()=>{
@@ -108,7 +108,7 @@ const formatTime=value=>value?new Date(value).toLocaleString('zh-CN'):'初始修
 function openPublic(){window.open('/tools/glyphlens/','_blank','noopener,noreferrer');}
 function submitEditor(){document.getElementById('char-edit-form')?.requestSubmit();}
 async function showSources(row) {
-    try{const data=await request('/sources?'+new URLSearchParams({character:row.character}));sourceCharacter.value=data.character;sourceRecords.value=data.records;sourceConfirmation.value=data.confirmation||{};sourceVisible.value=true;}
+    try{const data=await request('/sources?'+new URLSearchParams({character:row.character}));sourceCharacter.value=data.character;sourceRecords.value=data.records;sourceVisible.value=true;}
     catch(failure){Toast.error(failure.message);}
 }
 </script>
@@ -216,13 +216,12 @@ async function showSources(row) {
         <VModal :visible="sourceVisible" title="字形来源" :width="640" @close="sourceVisible=false">
             <div class="source-details">
                 <h3>原始资料</h3>
-                <p v-if="!sourceRecords.length">暂未关联原始出处。后台修正可在“修改记录”中查看。</p>
+                <p v-if="!sourceRecords.length">暂无来源记录。</p>
                 <section v-for="group in sourceGroups" :key="group.candidate" class="source-group">
                     <h4 v-if="group.candidate">{{sourceCharacter}} → {{group.candidate}}</h4>
                     <div v-for="(record,index) in group.records" :key="index" class="source-path">
-                        <p v-if="record.kind==='retained'" class="source-note">保留原字选项，属于转换策略，不作外部映射来源。</p>
-                        <p v-else-if="record.kind==='manual'" class="source-note">{{record.label}}：{{record.note}}</p>
-                        <p v-else-if="record.kind==='unresolved'" class="source-note">原始出处待补；已有确认记录仍保留。</p>
+                        <p v-if="record.kind==='manual'" class="source-note">{{record.label}}</p>
+                        <p v-else-if="record.kind==='unresolved'" class="source-note">暂无来源记录。</p>
                         <template v-else-if="record.steps?.length">
                             <p v-if="record.steps.length>1" class="source-note">经中间字归并：{{record.path.join(' → ')}}</p>
                             <p v-for="(step,stepIndex) in record.steps" :key="stepIndex">
@@ -234,11 +233,6 @@ async function showSources(row) {
                         </template>
                         <p v-else><a :href="record.url" target="_blank" rel="noopener noreferrer">{{record.label}}</a></p>
                     </div>
-                </section>
-                <section v-if="sourceConfirmation.status" class="source-confirmation">
-                    <h3>审核记录</h3>
-                    <p><a :href="sourceConfirmation.url" target="_blank" rel="noopener noreferrer">{{sourceConfirmation.label}}</a> · {{sourceConfirmation.date}}</p>
-                    <p>采用候选：{{sourceConfirmation.candidates.join(' / ')}}</p>
                 </section>
             </div>
         </VModal>

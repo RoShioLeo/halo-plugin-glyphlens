@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class GlyphSourcesTest {
     @Test @SuppressWarnings("unchecked")
-    void sourcesKeepDocumentaryEvidenceSeparateFromConfirmationWithoutWritingSiteState() {
+    void confirmedMappingsKeepOriginalSourcesWithoutDuplicateConfirmationIndexes() {
         var fixture = new StoreFixture();
         var store = new GlyphStore(fixture.documents, new GlyphCatalog());
         var result = store.source("U+3437").block();
@@ -16,12 +16,12 @@ class GlyphSourcesTest {
         var records = (List<Map<String,Object>>)result.get("records");
         assertTrue(records.stream().anyMatch(record -> "骂".equals(record.get("candidate")) && "documented".equals(record.get("kind"))));
         assertFalse(records.toString().contains("maintainer-decisions"));
-        var confirmation = (Map<String,Object>)result.get("confirmation");
-        assertEquals("confirmed", confirmation.get("status"));
-        assertEquals(List.of("骂"), confirmation.get("candidates"));
-        var added = (Map<String,Object>)store.source("竃").block().get("confirmation");
-        assertEquals("维护者手工补充并确认", added.get("label"));
-        assertTrue(((Map<?,?>)store.source("龘").block().get("confirmation")).isEmpty());
+        assertFalse(result.containsKey("confirmation"));
+        var added=(List<Map<String,Object>>)store.source("竃").block().get("records");
+        assertEquals("manual",added.getFirst().get("kind"));assertFalse(added.getFirst().containsKey("note"));
+        assertTrue(((List<?>)store.source("龘").block().get("records")).isEmpty());
+        var original=(List<Map<String,Object>>)store.source("乾").block().get("records");
+        assertTrue(original.stream().noneMatch(record->"乾".equals(record.get("candidate"))));
         assertTrue(fixture.resources.isEmpty());
     }
     @Test @SuppressWarnings("unchecked")

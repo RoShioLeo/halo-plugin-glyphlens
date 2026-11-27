@@ -73,8 +73,8 @@
   "manual-sources": {
     "file": "manual-sources.json",
     "updated": "2026-11-27",
-    "sha256": "175cd3a7cb022aa28fa3e9d9f78acaeff56b9b5a9f6a5c2ef82e9c703607c668",
-    "use": "Explicit manual additions without a verified original document; no external source is claimed and no candidates are added."
+    "sha256": "74de3e7b3562d0dedf55741befe084ff3651a3474ef865992a47d5641555c037",
+    "use": "Hand-maintained mappings."
   },
   "default-context-lexicon": {
     "file": "../data/lexicon.json",

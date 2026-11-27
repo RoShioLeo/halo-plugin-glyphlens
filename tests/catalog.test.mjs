@@ -32,6 +32,8 @@ test('compiled mappings are scalars, unknown characters stay unchanged, and no t
     for(const file of ['common.json','v2s.json','v2t.json'])assert(!fs.existsSync(new URL('../dictionary/data/'+file,import.meta.url)));
     assert.equal(new GlyphConverter(dictionary).convert('㐺㐁〇𪷍'),'㐺㐁〇𪷍');
     assert.equal(dictionary['干'],undefined);
+    assert.deepEqual(dictionary['神'],['神']);assert.notEqual('神'.codePointAt(0),'神'.codePointAt(0));
+    assert.equal(new GlyphConverter(dictionary).convert('神豈裏'),'神岂里');
 });
 test('pending targets are standard simplified glyphs or the original, never inferred traditional targets',()=>{
     const table=JSON.parse(gunzipSync(fs.readFileSync(new URL('../dictionary/research/inputs/TGH-transcription.json.gz',import.meta.url))));
@@ -80,24 +82,26 @@ test('bundled simplified context words choose reviewed glyphs and leave room for
     document.choose(document.positions[0],'干');assert(document.text().startsWith('干坤'));
 });
 
-test('default source counts account for every candidate relation without conflating source characters',()=>{
+test('default source counts cover replacements while overall counts preserve every candidate',()=>{
     const summary=read('dictionary/data/sources.json').summary;
     assert.equal(summary.version,fs.readFileSync(new URL('../dictionary/VERSION',import.meta.url),'utf8').trim());
     assert.equal(summary.counts.records,Object.keys(dictionary).length);
     assert.equal(summary.counts.relations,Object.values(dictionary).reduce((n,values)=>n+values.length,0));
-    assert.equal(Object.values(summary.source_counts).reduce((n,source)=>n+source.relations,0),summary.counts.relations);
+    const replacements=Object.entries(dictionary).reduce((n,[source,values])=>n+values.filter(target=>target!==source).length,0);
+    assert.equal(Object.values(summary.source_counts).reduce((n,source)=>n+source.relations,0),replacements);
+    assert(!('retained' in summary.source_counts));
     for(const source of Object.values(summary.source_counts))assert(source.characters<=source.relations);
     assert.equal(summary.lexicon.rules,read('dictionary/data/lexicon.json').length);
 });
 
-test('every candidate retains checkable evidence or an explicit original-character policy independently of approval',()=>{
-    const {entries,confirmations,summary}=read('dictionary/data/sources.json');
-    const decisions=read('dictionary/research/maintainer-decisions.json');
+test('replacement candidates keep original sources without self-mapping or confirmation indexes',()=>{
+    const sources=read('dictionary/data/sources.json');
+    const {entries,summary}=sources;assert(!('confirmations' in sources));
     for(const [source,candidates] of Object.entries(dictionary)) {
-        assert.deepEqual([...new Set(entries[source].map(record=>record.candidate))],candidates,source);
-        for(const record of entries[source]) {
-            if(record.kind==='retained'){assert.equal(record.candidate,source);assert.deepEqual(record.steps,[]);continue;}
-            if(record.kind==='manual'){assert.equal(source,'竃');assert.equal(record.candidate,'灶');assert.deepEqual(record.steps,[]);assert(!record.url);continue;}
+        assert.deepEqual([...new Set((entries[source]||[]).map(record=>record.candidate))],candidates.filter(target=>target!==source),source);
+        for(const record of entries[source]||[]) {
+            assert.notEqual(record.candidate,source);
+            if(record.kind==='manual'){assert.equal(source,'竃');assert.equal(record.candidate,'灶');assert.deepEqual(record.steps,[]);assert(!record.url);assert(!record.note);continue;}
             assert.equal(record.kind,'documented',source+' → '+record.candidate);
             assert.equal(record.path[0],source);assert.equal(record.path.at(-1),record.candidate);
             assert.equal(record.path.length,record.steps.length+1);
@@ -108,11 +112,6 @@ test('every candidate retains checkable evidence or an explicit original-charact
             });
         }
     }
-    for(const [source,candidates] of Object.entries(decisions.accepted)) {
-        assert.deepEqual(confirmations[source].candidates,candidates);
-        assert.equal(confirmations[source].status,'confirmed');
-    }
-    assert.equal(summary.source_counts.retained.relations,45);assert.equal(summary.source_counts.unresolved.relations,0);
+    assert(!('retained' in summary.source_counts));assert(!('unresolved' in summary.source_counts));
     const added=entries['竃'].find(record=>record.candidate==='灶');assert.equal(added.kind,'manual');assert(!added.url);
-    assert.equal(confirmations['竃'].label,'维护者手工补充并确认');
 });

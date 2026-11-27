@@ -43,18 +43,18 @@ class ProvenanceTest(unittest.TestCase):
         self.assertTrue(record['steps'][1]['reversed'])
 
     def test_retention_and_missing_evidence_are_not_invented_sources(self):
-        self.assertEqual('retained', self.evidence.records('乾', '乾')[0]['kind'])
+        self.assertEqual([], self.evidence.records('乾', '乾'))
         self.assertEqual('unresolved', self.evidence.records('龘', '甲')[0]['kind'])
         # General multi-hop traversal would incorrectly present this as proof.
         self.assertEqual('unresolved', self.evidence.records('甲', '丁')[0]['kind'])
 
-    def test_confirmation_does_not_become_evidence_or_add_a_candidate(self):
-        mapping = {'㐷': ['骂'], '龘': ['甲']}
+    def test_compilation_keeps_original_sources_without_self_mapping_records(self):
+        mapping = {'㐷': ['骂'], '乾': ['乾', '干'], '龘': ['甲']}
         original = copy.deepcopy(mapping)
-        decisions = {'accepted': mapping, 'updated': '2026-11-27'}
-        records, confirmations = compile_provenance(self.cache, mapping, decisions)
+        records = compile_provenance(self.cache, mapping)
         self.assertEqual(original, mapping)
-        self.assertEqual('confirmed', confirmations['龘']['status'])
+        self.assertEqual('documented', records['㐷'][0]['kind'])
+        self.assertFalse(any(record['candidate'] == c for c, values in records.items() for record in values))
         self.assertEqual('unresolved', records['龘'][0]['kind'])
         self.assertNotIn('maintainer-decisions', json.dumps(records))
 
@@ -62,7 +62,7 @@ class ProvenanceTest(unittest.TestCase):
         record = self.evidence.records('竃', '灶')[0]
         self.assertEqual('manual', record['kind'])
         self.assertEqual('手动维护来源', record['label'])
-        self.assertIn('尚待核对', record['note'])
+        self.assertNotIn('note', record)
         self.assertEqual([], record['steps'])
         self.assertNotIn('url', record)
 

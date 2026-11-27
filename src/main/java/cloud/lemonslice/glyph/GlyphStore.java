@@ -168,12 +168,11 @@ public final class GlyphStore {
                 return Map.of("summary",summary,"links",catalog.sources().getOrDefault("links",Map.of()));
             }
             var index=(Map<String,Object>)catalog.sources().getOrDefault("entries",Map.of());
-            var confirmations=(Map<String,Object>)catalog.sources().getOrDefault("confirmations",Map.of());
             var entry=state.known(c);var candidates=entry!=null && entry.candidates()!=null?entry.candidates():base(state).getOrDefault(c,List.of(c));
             var records=new ArrayList<Map<String,Object>>();
-            for(var record:(List<Map<String,Object>>)index.getOrDefault(c,catalog.referenceRecords(c)))if(!record.containsKey("candidate") || candidates.contains(record.get("candidate")))records.add(record);
-            if(entry!=null)for(String target:candidates)if(records.stream().noneMatch(record->target.equals(record.get("candidate"))))records.add(Map.of("candidate",target,"kind","manual","label","手动维护来源","note","站点自定义修正，原始文献出处尚待核对。","steps",List.of()));
-            return Map.of("character",c,"records",records,"confirmation",confirmations.getOrDefault(c,Map.of()));
+            for(var record:(List<Map<String,Object>>)index.getOrDefault(c,catalog.referenceRecords(c)))if(!"retained".equals(record.get("kind")) && !c.equals(record.get("candidate")) && (!record.containsKey("candidate") || candidates.contains(record.get("candidate"))))records.add(record);
+            if(entry!=null)for(String target:candidates)if(!target.equals(c) && records.stream().noneMatch(record->target.equals(record.get("candidate"))))records.add(Map.of("candidate",target,"kind","manual","label","手动维护来源","steps",List.of()));
+            return Map.of("character",c,"records",records);
         });
     }
     static String note(String text) {

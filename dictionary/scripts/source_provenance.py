@@ -106,27 +106,20 @@ class SourceEvidence:
 
     def records(self, c, target):
         if c == target:
-            return [{'candidate': target, 'kind': 'retained', 'label': '保留原字选项', 'steps': []}]
+            return []
         paths = self.paths(c, target)
         if not paths:
             if (c, target) in self.manual_sources:
                 item = self.manual_sources[c, target]
-                return [{'candidate': target, 'kind': 'manual', 'label': item['label'], 'note': item['note'], 'steps': []}]
+                return [{'candidate': target, 'kind': 'manual', 'label': item['label'], 'steps': []}]
             return [{'candidate': target, 'kind': 'unresolved', 'label': '原始出处待补', 'steps': []}]
         return [{'candidate': target, 'kind': 'documented', 'source': path[0]['source'],
                  'label': '；'.join(dict.fromkeys(step['label'] for step in path)), 'url': path[0]['url'],
                  'path': [c] + [step['to'] for step in path], 'steps': path} for path in paths]
 
 
-def compile_provenance(cache, mapping, decisions):
+def compile_provenance(cache, mapping):
     evidence = SourceEvidence(cache)
     entries = {c: [record for target in values for record in evidence.records(c, target)]
                for c, values in sorted(mapping.items(), key=lambda item: ord(item[0]))}
-    confirmations = {c: {'status': 'confirmed', 'date': decisions['updated'], 'candidates': values,
-                         'label': '维护者审核：确认采用的候选及顺序',
-                         'url': 'https://github.com/RoShioLeo/halo-plugin-glyphlens/blob/main/dictionary/research/maintainer-decisions.json'}
-                     for c, values in decisions['accepted'].items()}
-    for item in evidence.manual_sources.values():
-        if item['character'] in confirmations and item['candidate'] in mapping.get(item['character'], []):
-            confirmations[item['character']]['label'] = item['contribution']
-    return entries, confirmations
+    return {c: records for c, records in entries.items() if records}

@@ -96,7 +96,6 @@ def compile_catalog(cache,output):
                 mapping[alias]=mapping[canonical]
                 aliases.add(alias)
                 references[alias].append({'label':f'Unicode 规范等价 U+{point:04X}','url':'https://www.unicode.org/reports/tr15/'})
-    mapping={c:values for c,values in mapping.items() if values!=[c]}
     punctuation={'︵':'（','︶':'）','︻':'【','︼':'】','﹁':'「','﹂':'」','﹃':'『','﹄':'』','︽':'《','︾':'》','︿':'〈','﹀':'〉'}
     for c,target in punctuation.items():
         mapping[c]=[target]
@@ -109,13 +108,15 @@ def compile_catalog(cache,output):
         mapping[c]=values;reviews.pop(c,None)
     for c in decisions['rejected']:
         mapping.pop(c,None);reviews.pop(c,None)
+    mapping={c:values for c,values in mapping.items() if values!=[c]}
+    assert not reviews, '默认字库只收录已确认的映射'
     counts={'records':len(mapping),'relations':sum(map(len,mapping.values())),'pending':len(reviews),'multi':sum(len(v)>1 for v in mapping.values())}
-    provenance,confirmations=compile_provenance(cache,mapping,decisions)
+    provenance=compile_provenance(cache,mapping)
+    assert all(item['kind']!='unresolved' for records in provenance.values() for item in records), '默认映射缺少已确定的来源'
     # Attribute each candidate relation once. A multi-candidate source may have
     # targets from different sources, so per-source character counts can overlap.
     def origin(c,target):
         records=[item for item in provenance[c] if item['candidate']==target]
-        if target==c:return 'retained'
         if all(item['kind']=='manual' for item in records):return 'manual'
         if all(item['kind']=='unresolved' for item in records):return 'unresolved'
         documented={item['source'] for item in records if item['kind']=='documented'}
@@ -129,18 +130,17 @@ def compile_catalog(cache,output):
     source_characters=defaultdict(set);source_relations=Counter()
     for c,values in mapping.items():
         for target in values:
+            if target==c:continue
             key=origin(c,target);source_characters[key].add(c);source_relations[key]+=1
-    source_counts={key:{'characters':len(source_characters[key]),'relations':source_relations[key]} for key in ['mainland','unicode','opencc','variants','manual','retained','unresolved']}
-    assert sum(item['relations'] for item in source_counts.values())==counts['relations']
+    source_counts={key:{'characters':len(source_characters[key]),'relations':source_relations[key]} for key in ['mainland','unicode','opencc','variants','manual','unresolved'] if source_relations[key]}
+    assert sum(item['relations'] for item in source_counts.values())==sum(target!=c for c,values in mapping.items() for target in values)
     lexicon=json.loads((ROOT/'data/lexicon.json').read_text(encoding='utf-8'))
-    summary={'scope':'繁体、异体字到常用简体；单一字库；维护者确认优先','mainland_standard':8105,'formal_traditional':2574,'formal_variants':1023,
-             'version':(ROOT/'VERSION').read_text(encoding='utf-8').strip(),
+    summary={'version':(ROOT/'VERSION').read_text(encoding='utf-8').strip(),
              'source_counts':source_counts,
              'lexicon':{'rules':len(lexicon),'contexts':sum(len(rule['contexts']) for rule in lexicon),'characters':len({rule['character'] for rule in lexicon})},
-             'reference_policy':{'simple_max_level':2,'automatic':len(supplements),'excluded':reference_stats},
-             'maintainer_decisions':{'accepted':len(decisions['accepted']),'rejected':len(decisions['rejected']),'updated':decisions['updated']},'counts':counts}
+             'counts':counts}
     sources={'summary':summary,'links':{'mainland':'https://www.moe.gov.cn/jyb_xwfb/moe_2082/siju/yywzxxgls/ztzl_yywzgfbz/201306/t20130601_186002.html','unicode':'https://www.unicode.org/reports/tr38/','opencc':'https://github.com/BYVoid/OpenCC/tree/fae2a0a911c30764e669a7d8b0591cd8e852934a/data/dictionary','variants':'https://dict.variants.moe.edu.tw/'},
-             'entries':provenance,'confirmations':confirmations}
+             'entries':provenance}
     for c in sorted(set(reviews)-set(mapping),key=ord):
         sources['entries'][c]=list({(item['label'],item['url']):item for item in references[c]}.values())
     output.mkdir(parents=True,exist_ok=True)

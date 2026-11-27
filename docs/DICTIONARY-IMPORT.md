@@ -59,7 +59,7 @@
 | `manifest.json` | `glyphlens-dictionary` 格式标识、格式版本 `1`、`dictionaryVersion`，以及数据文件的 SHA-256 校验值。 |
 | `dictionary.json` | 默认单字映射及候选顺序。 |
 | `lexicon.json` | 默认上下文消歧词典，只在已有多候选中选择，不执行词汇翻译。 |
-| `sources.json` | 映射的原始资料、归并路径、独立审核记录和默认统计。 |
+| `sources.json` | 映射的原始资料、归并路径和来源统计。 |
 | `reviews.json`、`reference.json` | 待审与补充参考索引；未确认的额外候选不因此自动生效。 |
 | `version.json` | 字库版本与由实际数据生成的统计。 |
 | `README.md`、`FORMAT.md`、`NOTICE.md`、`LICENSE`、`licenses/` | 说明、本格式文档、署名及原始资料许可。 |

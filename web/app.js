@@ -5,7 +5,7 @@ let converterCache = null;
 const element = id => document.getElementById(id);
 const selected = name => [...document.getElementsByName(name)].find(input => input.checked).value;
 const isReviewMode = () => selected('mode') === 'one2many';
-let result = null, revision = 0, operations = 0, outputFilename = '字镜-转换结果.txt';
+let result = null, reviewing = false, revision = 0, operations = 0, outputFilename = '字镜-转换结果.txt';
 const status = (message, error = false) => {
     element('conversionStatus').textContent = message;
     element('conversionStatus').dataset.error = String(error);
@@ -20,22 +20,28 @@ window.addEventListener('focus', () => { converterCache = null; });
 const review = new ReviewView({
     panel: element('reviewPanel'), text: element('reviewText'), status: element('reviewStatus'),
     previous: element('previousCandidate'), next: element('nextCandidate'), picker: element('candidatePicker'),
+    confirmRemaining: element('confirmRemaining'),
     source: element('candidateSource'), choices: element('candidateChoices'),
 }, document => { if (result === document) { renderOutput(); status(''); } });
 
 function renderOutput() {
     const text = result?.text() ?? '';
+    const active = !!result && isReviewMode() && reviewing;
     element('outputText').value = text;
     element('copyOutput').disabled = element('downloadOutput').disabled = !text;
-    element('outputText').hidden = !!result && isReviewMode();
-    element('outputLabel').textContent = result && isReviewMode() ? '校对结果' : '转换结果';
-    if (result && isReviewMode()) review.show(result);
+    element('outputText').hidden = active;
+    element('outputLabel').textContent = active ? '校对结果' : '转换结果';
+    element('startReview').hidden = !isReviewMode();
+    element('startReview').disabled = !result;
+    element('startReview').textContent = active ? '结束校对' : '开始校对';
+    if (active) review.show(result);
     else element('reviewPanel').hidden = true;
 }
 
 function invalidate() {
     revision++;
     result = null;
+    reviewing = false;
     review.clear();
     renderOutput();
     status('');
@@ -74,6 +80,7 @@ async function convertInput(token) {
     const converter = await currentConverter();
     if (token !== revision || input !== element('inputText').value) return;
     result = converter.review(input);
+    reviewing = false;
     outputFilename = '字镜-转换结果.txt';
     renderOutput();
 }
@@ -82,10 +89,15 @@ element('convertText').addEventListener('click', () => runConversion(convertInpu
 element('inputText').addEventListener('input', invalidate);
 document.querySelectorAll('input[name="mode"]').forEach(input => input.addEventListener('change', () => {
     revision++;
+    reviewing = false;
     renderOutput();
     updateFileControls();
     status('');
 }));
+element('startReview').addEventListener('click',()=>{
+    if(!result || !isReviewMode())return;
+    reviewing=!reviewing;renderOutput();status('');
+});
 
 element('clearText').addEventListener('click', () => {
     element('inputText').value = '';
@@ -148,6 +160,7 @@ element('convertFile').addEventListener('click', () => runConversion(async token
     const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     element('inputText').value = text;
     result = converter.review(text);
+    reviewing = false;
     outputFilename = file.name.replace(/\.[^.]+$/, '') + '-转换结果.txt';
     renderOutput();
     if (!isReviewMode()) downloadResult();

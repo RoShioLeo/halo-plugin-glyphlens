@@ -16,7 +16,7 @@ async function fixture(t, options = {}) {
     for (const [name, value] of Object.entries({window, document, navigator: window.navigator, fetch: async path => {
         path = String(path);
         if (path === 'access') return {ok: true, json: async () => ({canManage: false})};
-        if (path.startsWith('lexicon.json')) return {ok: true, json: async () => []};
+        if (path.startsWith('lexicon.json')) return {ok: true, json: async () => options.rules || []};
         if (path === 'dictionary.json') {
             if (options.dictionary) return options.dictionary(path);
             const value = {'乾': ['乾', '干'], '發': ['发']};
@@ -61,97 +61,73 @@ async function fixture(t, options = {}) {
     return {window, document, get, radio, input, idle, convert, file, copied, downloads, blobs};
 }
 
-test('default mode uses native capsule radio groups and exports plain converted text', async t => {
-    const {document, get, convert, copied} = await fixture(t);
-    assert.equal(document.querySelector('input[name="mode"]:checked').value, 'one2one');
-    assert.equal(document.querySelectorAll('.controls select').length, 0);
-    assert.equal(document.querySelectorAll('.controls fieldset').length, 1);
-    await convert('乾乾');
-    assert.equal(get('outputText').value, '乾乾');
-    assert.equal(get('outputText').hidden, false);
-    assert.equal(get('reviewPanel').hidden, true);
-    get('copyOutput').click();
-    await pause(0);
-    assert.deepEqual(copied, ['乾乾']);
+test('default mode exports plain converted text and does not show the review entry', async t => {
+    const {document,get,convert,copied}=await fixture(t);
+    assert.equal(document.querySelector('input[name="mode"]:checked').value,'one2one');
+    assert.equal(document.querySelectorAll('.controls select').length,0);
+    assert.equal(document.querySelectorAll('.controls fieldset').length,1);
+    await convert('乾乾');assert.equal(get('outputText').value,'乾乾');
+    assert.equal(get('outputText').hidden,false);assert.equal(get('reviewPanel').hidden,true);assert.equal(get('startReview').hidden,true);
+    get('copyOutput').click();await pause(0);assert.deepEqual(copied,['乾乾']);
 });
-
-test('per-occurrence choices auto-advance, support keyboard, and survive view changes', async t => {
-    const {window, document, get, radio, convert, copied} = await fixture(t);
-    radio('modeCandidates');
-    await convert('乾乾');
-    assert.equal(get('reviewPanel').hidden, false);
-    assert.equal(get('outputText').hidden, true);
-    assert.equal(get('reviewStatus').textContent, '待校对 2 / 2 处');
-    document.querySelector('.review-word.is-active').dispatchEvent(new window.KeyboardEvent('keydown', {key: '2', bubbles: true, cancelable: true}));
-    assert.equal(get('outputText').value, '干乾');
-    get('previousCandidate').click();
+test('candidate mode enters review only after Start; per-occurrence choices survive ending and view changes', async t => {
+    const {window,document,get,radio,convert,copied}=await fixture(t);
+    radio('modeCandidates');assert.equal(get('startReview').disabled,true);
+    await convert('乾乾');assert.equal(get('reviewPanel').hidden,true);assert.equal(get('outputText').hidden,false);
+    get('startReview').click();assert.equal(get('reviewPanel').hidden,false);assert.equal(get('reviewStatus').textContent,'待校对 2 / 2 处');
+    document.querySelector('.review-word.is-active').dispatchEvent(new window.KeyboardEvent('keydown',{key:'2',bubbles:true,cancelable:true}));
+    assert.equal(get('outputText').value,'干乾');get('previousCandidate').click();
     get('candidateChoices').querySelector('[data-candidate="乾"]').click();
     get('candidateChoices').querySelector('[data-candidate="干"]').click();
-    assert.equal(get('outputText').value, '乾干');
-    assert.equal(get('reviewStatus').textContent, '已校对 2 处');
-    radio('modeDefault');
-    assert.equal(get('outputText').hidden, false);
-    assert.equal(get('outputText').value, '乾干');
-    radio('modeCandidates');
-    assert.equal(document.querySelectorAll('.review-word.is-reviewed').length, 2);
-    get('copyOutput').click();
-    await pause(0);
-    assert.deepEqual(copied, ['乾干']);
+    assert.equal(get('outputText').value,'乾干');assert.equal(get('reviewStatus').textContent,'已校对 2 处');
+    get('startReview').click();assert.equal(get('reviewPanel').hidden,true);assert.equal(get('outputText').value,'乾干');
+    radio('modeDefault');radio('modeCandidates');assert.equal(get('reviewPanel').hidden,true);
+    get('startReview').click();assert.equal(document.querySelectorAll('.review-word.is-reviewed').length,2);
+    get('copyOutput').click();await pause(0);assert.deepEqual(copied,['乾干']);
 });
-
-test('changing the original invalidates choices and the removed direction controls never return', async t => {
-    const {get, radio, convert, input, idle} = await fixture(t);
-    radio('modeCandidates');
-    await convert('乾');
-    get('candidateChoices').querySelector('[data-candidate="干"]').click();
-    assert.equal(get('outputText').value, '干');
-    assert.equal(get('targetTraditional'), null);
-    assert.equal(get('feedbackDirection'), null);
-    get('openFeedback').click();
-    input('新文本');
-    assert.equal(get('outputText').value, '');
-    assert.equal(get('copyOutput').disabled, true);
-    assert.equal(get('downloadOutput').disabled, true);
-    assert.equal(get('reviewPanel').hidden, true);
+test('editing the original invalidates choices and requires explicitly starting the next review', async t => {
+    const {get,radio,convert,input}=await fixture(t);radio('modeCandidates');await convert('乾');get('startReview').click();
+    get('candidateChoices').querySelector('[data-candidate="干"]').click();assert.equal(get('outputText').value,'干');
+    assert.equal(get('targetTraditional'),null);assert.equal(get('feedbackDirection'),null);get('openFeedback').click();
+    input('新文本');assert.equal(get('outputText').value,'');assert.equal(get('copyOutput').disabled,true);
+    assert.equal(get('downloadOutput').disabled,true);assert.equal(get('reviewPanel').hidden,true);assert.equal(get('startReview').disabled,true);
 });
-
-test('file candidate mode previews before download and exports only chosen text with exact line endings', async t => {
-    const {get, radio, file, idle, downloads, blobs} = await fixture(t);
-    radio('modeCandidates');
-    file('草稿.txt', '乾\r\n');
-    get('convertFile').click();
-    await idle();
-    assert.equal(downloads.length, 0);
-    assert.equal(get('inputText').value, '乾\r\n');
-    get('candidateChoices').querySelector('[data-candidate="干"]').click();
-    get('downloadOutput').click();
-    assert.equal(downloads[0].name, '草稿-转换结果.txt');
-    assert.equal(await blobs[0].text(), '干\r\n');
+test('candidate files show plain results before review and download only selected text with original line endings', async t => {
+    const {get,radio,file,idle,downloads,blobs}=await fixture(t);radio('modeCandidates');file('草稿.txt','乾\r\n');
+    get('convertFile').click();await idle();assert.equal(downloads.length,0);assert.equal(get('reviewPanel').hidden,true);
+    assert.equal(get('inputText').value,'乾\r\n');get('startReview').click();
+    get('candidateChoices').querySelector('[data-candidate="干"]').click();get('downloadOutput').click();
+    assert.equal(downloads[0].name,'草稿-转换结果.txt');assert.equal(await blobs[0].text(),'干\r\n');
 });
-
-test('default file conversion keeps the direct download action', async t => {
-    const {get, file, idle, downloads, blobs} = await fixture(t);
-    file('正文.txt', '發乾');
-    get('convertFile').click();
-    await idle();
-    assert.equal(downloads.length, 1);
-    assert.equal(await blobs[0].text(), '发乾');
+test('default file conversion keeps its direct download action', async t => {
+    const {get,file,idle,downloads,blobs}=await fixture(t);file('正文.txt','發乾');get('convertFile').click();await idle();
+    assert.equal(downloads.length,1);assert.equal(await blobs[0].text(),'发乾');
 });
-
-test('literal markup is rendered as text and cancelling an in-flight input never replaces new work', async t => {
-    let complete;
-    const response = new Promise(resolve => { complete = resolve; });
-    const {get, radio, input, idle, convert} = await fixture(t, {dictionary: () => response});
-    input('旧文本');
-    get('convertText').click();
-    input('<b>乾</b>');
-    complete({ok: true, json: async () => ({'乾': ['乾', '干']})});
-    await idle();
-    assert.equal(get('outputText').value, '');
-    assert.equal(get('copyOutput').disabled, true);
-    radio('modeCandidates');
-    await convert('<b>乾</b>');
-    assert.equal(get('outputText').value, '<b>乾</b>', get('conversionStatus').textContent);
-    assert.equal(get('reviewText').querySelector('b'), null);
-    assert.equal(get('reviewText').textContent, '<b>乾</b>');
+test('literal markup stays text and a late request never replaces newer input', async t => {
+    let complete;const response=new Promise(resolve=>{complete=resolve;});
+    const {get,radio,input,idle,convert}=await fixture(t,{dictionary:()=>response});
+    input('旧文本');get('convertText').click();input('<b>乾</b>');
+    complete({ok:true,json:async()=>({'乾':['乾','干']})});await idle();
+    assert.equal(get('outputText').value,'');assert.equal(get('copyOutput').disabled,true);
+    radio('modeCandidates');await convert('<b>乾</b>');get('startReview').click();
+    assert.equal(get('outputText').value,'<b>乾</b>');assert.equal(get('reviewText').querySelector('b'),null);assert.equal(get('reviewText').textContent,'<b>乾</b>');
+});
+test('dictionary matches select the default candidate but wait for user confirmation', async t => {
+    const {get,document,radio,convert,copied}=await fixture(t,{rules:[{character:'乾',candidate:'干',contexts:['干燥']}]});
+    radio('modeCandidates');await convert('乾燥');assert.equal(get('outputText').value,'干燥');assert.equal(get('reviewPanel').hidden,true);
+    get('startReview').click();assert.equal(get('reviewStatus').textContent,'待校对 1 / 1 处');
+    assert.equal(document.querySelectorAll('.review-word.is-reviewed').length,0);assert.equal(get('confirmRemaining').disabled,false);
+    assert.equal(get('candidateChoices').querySelector('[data-candidate="干"]').getAttribute('aria-pressed'),'true');
+    get('candidateChoices').querySelector('[data-candidate="乾"]').click();assert.equal(get('outputText').value,'乾燥');
+    assert.equal(get('reviewStatus').textContent,'已校对 1 处');
+    radio('modeDefault');get('copyOutput').click();await pause(0);assert.deepEqual(copied,['乾燥']);
+});
+test('Confirm remaining preserves displayed defaults and manual choices and allows later changes', async t => {
+    const {get,document,radio,convert}=await fixture(t);radio('modeCandidates');await convert('乾乾乾');get('startReview').click();
+    get('candidateChoices').querySelector('[data-candidate="干"]').click();const before=get('outputText').value;
+    get('confirmRemaining').click();assert.equal(get('outputText').value,before);assert.equal(get('reviewStatus').textContent,'已校对 3 处');
+    assert.equal(get('candidatePicker').hidden,true);assert.equal(get('confirmRemaining').disabled,true);
+    assert.equal(document.querySelectorAll('.review-word.is-reviewed').length,3);
+    document.querySelectorAll('.review-word')[1].click();get('candidateChoices').querySelector('[data-candidate="干"]').click();
+    assert.equal(get('outputText').value,'干干乾');
 });

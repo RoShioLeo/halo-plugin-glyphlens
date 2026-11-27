@@ -1,80 +1,67 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GlyphConverter } from '../web/engine.js';
+import { DisambiguationIndex } from '../web/lexicon.js';
+const rule=(character,candidate,...contexts)=>({character,candidate,contexts});
 
-test('unmapped glyph sequences preserve their base, selectors and combining marks in both modes', () => {
-    const converter = new GlyphConverter({'乾':['干'], '𠀀':['一'], e:['E'], '❤':['心'], '👩':['女']});
-    const sequences = ['乾\uFE00', '乾\u{E0100}', '𠀀\u{E01EF}', 'e\u0301', '❤️', '👩‍💻'];
-    for (const mode of ['one2one', 'one2many']) {
-        converter.setMode(mode);
-        for (const sequence of sequences) assert.equal(converter.convert(sequence + '乾'), sequence + '干');
-    }
+test('unmapped glyph sequences preserve their base, selectors and combining marks in both modes',()=>{
+    const converter=new GlyphConverter({'乾':['干'],'𠀀':['一'],e:['E'],'❤':['心'],'👩':['女']});
+    for(const mode of ['one2one','one2many'])for(const sequence of ['乾\uFE00','乾\u{E0100}','𠀀\u{E01EF}','e\u0301','❤️','👩‍💻'])
+        assert.equal(converter.setMode(mode).convert(sequence+'乾'),sequence+'干');
 });
-
-test('lexicon cannot match through a protected glyph sequence or apply its choices to that glyph', () => {
-    const converter = new GlyphConverter({'乾':['乾','干']}, [
-        {phrase:'乾燥', choices:[{offset:0,source:'乾',target:'干'}]},
-        {phrase:'水乾', choices:[{offset:1,source:'乾',target:'干'}]},
-    ]);
-    converter.setMode('one2many');
-    assert.equal(converter.convert('水乾\u{E0100}燥 乾燥'), '水乾\u{E0100}燥 干燥');
-    assert.equal(converter.convert('水\uFE00乾'), '水\uFE00【乾|干】');
-    converter.setMode('one2one');
-    assert.equal(converter.convert('水乾\u{E0100}燥 乾燥'), '水乾\u{E0100}燥 干燥');
+test('context matching never crosses protected glyph sequences',()=>{
+    const converter=new GlyphConverter({'乾':['干','乾']},[rule('乾','干','干燥','水干')]);
+    assert.equal(converter.setMode('one2many').convert('水乾\u{E0100}燥 乾燥'),'水乾\u{E0100}燥 干燥');
+    assert.equal(converter.convert('水\uFE00乾'),'水\uFE00【干|乾】');
+    assert.equal(converter.review('水\uFE00乾').pending,1);
 });
-
-test('both modes preserve candidate order and replace each original character only once', async () => {
-    const converter = new GlyphConverter({'发':['發','髮','發'], A:['B'], B:['C'], '𠀀':['一']});
-    await converter.loaded;
-    converter.setMode('one2many');
-    assert.equal(converter.convert('发A𠀀🙂'), '【發|髮】B一🙂');
-    converter.setMode('one2one');
-    assert.equal(converter.convert('发A𠀀🙂'), '發B一🙂');
-    assert.throws(() => converter.setMode('automatic'), /未知/);
+test('candidate order is stable and every original character is replaced exactly once',()=>{
+    const converter=new GlyphConverter({A:['B'],B:['C'],'𠀀':['一'],'乾':['干','乾','干']});
+    assert.equal(converter.convert('A𠀀乾🙂'),'B一干🙂');
+    assert.equal(converter.setMode('one2many').convert('A乾'),'B【干|乾】');
+    assert.throws(()=>converter.setMode('automatic'),/未知/);
 });
-
-test('a supplementary source is one character and unknown text is unchanged', () => {
-    const converter = new GlyphConverter({'𪷍':['㵾']});
-    assert.equal(converter.convert('𪷍，㵾\nabc'), '㵾，㵾\nabc');
-    assert.throws(() => new GlyphConverter({'词语':['字']}), /单字/);
-    assert.throws(() => new GlyphConverter({'字':['词语']}), /单字/);
-    assert.throws(() => new GlyphConverter({'\ud800':['一']}), /单字/);
+test('supplementary scalars work and dictionary entries cannot become word replacements',()=>{
+    assert.equal(new GlyphConverter({'𪷍':['㵾']}).convert('𪷍，㵾\nabc'),'㵾，㵾\nabc');
+    for(const dictionary of [{'词语':['字']},{'字':['词语']},{'\ud800':['一']}])assert.throws(()=>new GlyphConverter(dictionary),/单字/);
 });
-
-test('compatibility aliases must be explicit and unmatched codepoints remain unchanged', () => {
-    const converter = new GlyphConverter({'豈':['岂'],'\uf900':['岂']});
-    assert.equal(converter.convert('\uf900豈'), '岂岂');
-    const unknown = new GlyphConverter({});
-    assert.equal(unknown.convert('\uf900e\u0301'), '\uf900e\u0301');
+test('compatibility aliases remain explicit and unknown codepoints are untouched',()=>{
+    assert.equal(new GlyphConverter({'豈':['岂'],'\uf900':['岂']}).convert('\uf900豈'),'岂岂');
+    assert.equal(new GlyphConverter({}).convert('\uf900e\u0301'),'\uf900e\u0301');
 });
-
-test('lexicon rules choose existing candidates without replacing words', () => {
-    const rules = [
-        {phrase:'乾隆', choices:[{offset:0, source:'乾', target:'乾'}]},
-        {phrase:'乾燥', choices:[{offset:0, source:'乾', target:'干'}]},
-        {phrase:'鼠标', choices:[{offset:0, source:'鼠', target:'滑'}, {offset:1, source:'标', target:'鼠'}]},
-    ];
-    const converter = new GlyphConverter({'乾':['乾','干']}, rules);
-    assert.equal(converter.convert('乾隆与乾燥，鼠标'), '乾隆与干燥，鼠标');
-    converter.setMode('one2one');
-    assert.equal(converter.convert('乾隆与乾燥，鼠标'), '乾隆与干燥，鼠标');
+test('only ambiguous source characters consult simplified contexts across approved neighbouring glyphs',()=>{
+    const converter=new GlyphConverter({'乾':['干','乾'],'沈':['沈','沉'],'沒':['没'],'陽':['阳'],'彷':['彷','仿'],'彿':['佛']},[
+        rule('乾','干','干燥'),rule('乾','乾','乾坤'),rule('沈','沉','沉没'),rule('沈','沈','沈阳'),rule('彷','仿','仿佛')]);
+    for(const mode of ['one2one','one2many'])assert.equal(converter.setMode(mode).convert('乾燥乾坤沈沒沈陽彷彿'),'干燥乾坤沉没沈阳仿佛');
+    const document=converter.review('乾燥乾坤沈沒沈陽彷彿');
+    assert.equal(document.pending,5);assert.equal(document.matchedCount,5);
 });
-
-test('longest phrase wins per position; equal-length conflicting rules retain candidates', () => {
-    const converter = new GlyphConverter({'干':['干','乾','幹']}, [
-        {phrase:'干货', choices:[{offset:0, source:'干', target:'乾'}]},
-        {phrase:'干货架', choices:[{offset:0, source:'干', target:'干'}]},
-        {phrase:'干事', choices:[{offset:0, source:'干', target:'干'}]},
-        {phrase:'干事', choices:[{offset:0, source:'干', target:'幹'}]},
-    ]);
-    converter.setMode('one2many');
-    assert.equal(converter.convert('干货，干货架，干事'), '乾货，干货架，【干|幹】事');
+test('longer context wins while equal-length conflicting meanings remain unresolved',()=>{
+    const converter=new GlyphConverter({'乾':['干','乾']},[
+        rule('乾','干','干果','干物'),rule('乾','乾','乾果酒','乾物')]);
+    assert.equal(converter.setMode('one2many').convert('乾果，乾果酒，乾物，乾'),'干果，乾果酒，【干|乾】物，【干|乾】');
+    assert.equal(converter.review('乾物').pending,1);
 });
-
-test('lexicon offsets use code points and cannot bypass withdrawn character relations', () => {
-    const rules=[{phrase:'𠀀干', choices:[{offset:1,source:'干',target:'幹'}]}];
-    const converter=new GlyphConverter({'干':['干','幹']}, rules);
-    assert.equal(converter.convert('𠀀干'), '𠀀幹');
-    converter.install({}, rules);
-    assert.equal(converter.convert('𠀀干'), '𠀀干');
+test('a context cannot add a candidate or revive a withdrawn character relation',()=>{
+    const rules=[rule('乾','干','干燥'),rule('乾','字','字隆')];
+    const converter=new GlyphConverter({'乾':['干','乾']},rules);
+    assert.equal(converter.setMode('one2many').convert('乾隆'),'【干|乾】隆');
+    converter.install({'乾':['干']},rules);assert.equal(converter.review('乾燥').positions.length,0);
+    converter.install({},rules);assert.equal(converter.convert('乾燥'),'乾燥');assert.equal(converter.review('乾燥').positions.length,0);
+});
+test('adjacent ambiguous neighbours match their possible glyphs without cascading decisions',()=>{
+    const converter=new GlyphConverter({'乾':['干','乾'],'彷':['彷','仿']},[rule('乾','干','干仿'),rule('彷','仿','干仿')]);
+    assert.equal(converter.convert('乾彷'),'干仿');
+    assert.equal(converter.review('乾彷').pending,2);
+});
+test('repeated candidate positions and supplementary context characters use scalar offsets',()=>{
+    const converter=new GlyphConverter({'乾':['干','乾']},[rule('乾','干','干干净净','𠀀干')]);
+    assert.equal(converter.convert('乾乾净净𠀀乾'),'干干净净𠀀干');
+    assert.equal(converter.review('乾乾净净𠀀乾').pending,3);
+});
+test('unrelated text never probes the per-character context index',()=>{
+    const index=new DisambiguationIndex(Array.from({length:1000},(_,i)=>rule('乾','干','干'+i)));
+    let lookups=0;
+    assert.equal(index.resolve([...'普通文本abc'.repeat(5000)],()=>{lookups++;return [];}).size,0);
+    assert.equal(lookups,0);
 });

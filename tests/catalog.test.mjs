@@ -14,16 +14,18 @@ test('the one dictionary retains all 249 previously corroborated shared variants
 });
 test('all explicitly accepted live corrections and candidate order are shipped as defaults',()=>{
     const decisions=read('research/maintainer-decisions.json');
-    assert.equal(Object.keys(decisions.accepted).length,163);
+    assert.equal(Object.keys(decisions.accepted).length,225);
     for(const [source,values]of Object.entries(decisions.accepted)){assert.deepEqual(dictionary[source],values,source);assert(!reviews[source],source);}
     const converter=new GlyphConverter(dictionary);
     assert.equal(converter.convert('內於為絕閱乾寗竃㐷彷畫箚麼'),'内于为绝阅干宁灶骂彷画劄么');
     for(const source of decisions.rejected){assert(!dictionary[source]);assert(!reviews[source]);assert.equal(converter.convert(source),source);}
     assert.deepEqual(dictionary['彷'],['彷','仿']);assert.deepEqual(dictionary['畫'],['画','划']);
     assert.deepEqual(dictionary['箚'],['劄','札']);assert.deepEqual(dictionary['麼'],['么']);
+    assert.deepEqual(dictionary['䌷'],['䌷','绸']);assert.deepEqual(dictionary['硷'],['碱']);
+    assert.equal(converter.convert('䌷硷'),'䌷碱');assert.equal(converter.setMode('one2many').convert('䌷硷'),'【䌷|绸】碱');
 });
 test('compiled mappings are scalars, unknown characters stay unchanged, and no traditional dictionary is shipped',()=>{
-    assert.equal(Object.keys(dictionary).length,12656);
+    assert.equal(Object.keys(dictionary).length,12718);
     for(const [source,values]of Object.entries(dictionary)) {
         assert(scalar(source));assert(values.length);assert(values.every(scalar));assert.equal(new Set(values).size,values.length);assert.notDeepEqual(values,[source]);
     }
@@ -39,12 +41,12 @@ test('pending targets are standard simplified glyphs or the original, never infe
         for(const target of review.candidates)assert(target===source || standard.has(target),source+' → '+target);
         assert(!review.reasons.some(reason=>reason.includes('繁体补充') || reason.includes('具体繁体归属')));
     }
-    assert.equal(Object.keys(reviews).length,62);
+    assert.equal(Object.keys(reviews).length,0);
 });
 test('vertical punctuation and source data work through the same dictionary',()=>{
     const converter=new GlyphConverter(dictionary);
     assert.equal(converter.convert('︵︶︻︼﹁﹂﹃﹄︽︾︿﹀'),'（）【】「」『』《》〈〉');
-    const sources=read('data/sources.json');assert.equal(sources.summary.counts.records,12656);
+    const sources=read('data/sources.json');assert.equal(sources.summary.counts.records,12718);
     assert.deepEqual(Object.keys(sources.links).sort(),['mainland','opencc','unicode','variants']);
     assert(!/moe\.edu\.tw|台湾|異體字字典/.test(JSON.stringify(reviews)));
 });
@@ -54,4 +56,36 @@ test('multi-candidate mode and established source rules retain their meanings',(
     assert.equal(converter.setMode('one2one').convert('㐀㐅伱'),'丘五你');
     assert.deepEqual(dictionary['仝'],['同','仝']);assert.deepEqual(dictionary['線'],['线','缐']);
     for(const [source,rejected]of [['㵾','𪷍'],['㶆','𫞛'],['㷍','𤆢'],['㷿','𤈷'],['㸇','𤎺']])assert(!(dictionary[source]||[source]).includes(rejected));
+});
+
+test('bundled simplified context words choose reviewed glyphs and leave room for manual overrides',()=>{
+    const rules=read('data/lexicon.json');assert.equal(rules.length,18);
+    assert.equal(rules.reduce((count,rule)=>count+rule.contexts.length,0),75);
+    const ids=new Set();
+    for(const rule of rules) {
+        assert(!ids.has(rule.id));ids.add(rule.id);
+        assert(dictionary[rule.character]?.length>1);assert(dictionary[rule.character].includes(rule.candidate));
+        assert(rule.sources.length);
+        for(const word of rule.contexts) {
+            assert([...word].length>=2 && [...word].length<=64);assert([...word].includes(rule.candidate));
+            for(const c of word)if(c!==rule.candidate && dictionary[c]?.length===1)assert.equal(dictionary[c][0],c,'not a simplified context: '+word);
+        }
+    }
+    const converter=new GlyphConverter(dictionary,rules);
+    const input='乾坤乾燥彷彿彷徨沈沒沈陽瞭解瞭望藉口慰藉答覆覆蓋哪吒叱吒宮商角徵羽計畫繪畫';
+    const output='乾坤干燥仿佛彷徨沉没沈阳了解瞭望借口慰藉答复覆盖哪吒叱咤宫商角徵羽计划绘画';
+    assert.equal(converter.convert(input),output);
+    assert.equal(converter.setMode('one2many').convert(input),output);
+    const document=converter.review(input);assert.equal(document.pending,document.positions.length);assert.equal(document.matchedCount,document.positions.length);assert(document.positions.every(index=>!document.reviewed(index)));
+    document.choose(document.positions[0],'干');assert(document.text().startsWith('干坤'));
+});
+
+test('default source counts account for every candidate relation without conflating source characters',()=>{
+    const summary=read('data/sources.json').summary;
+    assert.equal(summary.version,'0.2.1');
+    assert.equal(summary.counts.records,Object.keys(dictionary).length);
+    assert.equal(summary.counts.relations,Object.values(dictionary).reduce((n,values)=>n+values.length,0));
+    assert.equal(Object.values(summary.source_counts).reduce((n,source)=>n+source.relations,0),summary.counts.relations);
+    for(const source of Object.values(summary.source_counts))assert(source.characters<=source.relations);
+    assert.equal(summary.lexicon.rules,read('data/lexicon.json').length);
 });

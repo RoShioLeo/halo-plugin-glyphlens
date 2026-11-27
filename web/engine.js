@@ -61,7 +61,7 @@ export class GlyphConverter {
     candidates(plan, position) {
         const values = plan.entries[position]?.candidates ?? [plan.characters[position]];
         const selected = plan.decisions.get(position)?.values;
-        return selected?.size ? values.filter(value => selected.has(value)) : values;
+        return selected?.size===1 ? values.filter(value => selected.has(value)) : values;
     }
     convert(input) {
         const plan = this.plan(input), output = [], key = this.mode === 'one2many' ? 'many' : 'one';
@@ -78,11 +78,12 @@ export class GlyphConverter {
         const plan = this.plan(input), parts = [];
         let text = [];
         for (let position = 0; position < plan.characters.length; position++) {
-            const candidates = this.candidates(plan, position);
-            if (candidates.length === 1) text.push(candidates[0]);
+            const candidates = plan.entries[position]?.candidates ?? [plan.characters[position]];
+            const selected = this.candidates(plan, position);
+            if (candidates.length === 1) text.push(selected[0]);
             else {
                 if (text.length) { parts.push(text.join('')); text = []; }
-                parts.push({source: plan.characters[position], candidates});
+                parts.push({source: plan.characters[position], candidates, initial:selected[0], matched:plan.decisions.has(position) && selected.length===1});
             }
         }
         if (text.length) parts.push(text.join(''));

@@ -8,6 +8,7 @@ export class ReviewView {
         const {panel, previous, next, text, choices} = elements;
         previous.addEventListener('click', () => this.move(-1));
         next.addEventListener('click', () => this.move(1));
+        elements.confirmRemaining.addEventListener('click',()=>this.confirmRemaining());
         text.addEventListener('click', event => {
             const button = event.target.closest?.('[data-review-position]');
             if (button) this.activate(Number(button.dataset.reviewPosition));
@@ -25,6 +26,7 @@ export class ReviewView {
                 event.preventDefault();
                 elements.picker.hidden = true;
                 this.buttons.get(this.active)?.setAttribute('aria-expanded', 'false');
+                this.buttons.get(this.active)?.classList.remove('is-active');
                 this.buttons.get(this.active)?.focus({preventScroll: true});
             } else if (!elements.picker.hidden && /^[1-9]$/.test(event.key) && !event.ctrlKey && !event.altKey && !event.metaKey) {
                 const value = this.document?.parts[this.active]?.candidates[Number(event.key) - 1];
@@ -61,7 +63,7 @@ export class ReviewView {
                 }
             });
             this.elements.text.append(fragment);
-            this.activate(document.positions[0], false);
+            this.activate(document.next(null,1,true), false);
         }
         this.elements.panel.hidden = false;
         this.updateStatus();
@@ -70,13 +72,15 @@ export class ReviewView {
         const button = this.buttons.get(index), part = this.document.parts[index];
         button.textContent = this.document.value(index);
         button.classList.toggle('is-reviewed', this.document.reviewed(index));
-        button.setAttribute('aria-label', `原字 ${part.source}，当前 ${button.textContent}，${part.candidates.length} 个候选${this.document.reviewed(index) ? '，已校对' : ''}`);
+        button.title=this.document.matched(index)?'词典建议，可修改':'';
+        button.setAttribute('aria-label', `原字 ${part.source}，当前 ${button.textContent}，${part.candidates.length} 个候选${this.document.reviewed(index)?'，已校对':this.document.matched(index)?'，词典建议，待校对':''}`);
         button.setAttribute('aria-expanded', String(this.active === index && !this.elements.picker.hidden));
     }
     updateStatus() {
-        const total = this.document.positions.length, pending = this.document.pending;
-        this.elements.status.textContent = !total ? '没有多候选字' : pending ? `待校对 ${pending} / ${total} 处` : `已校对 ${total} 处`;
+        const total=this.document.positions.length,pending=this.document.pending;
+        this.elements.status.textContent=!total?'没有多候选字':pending?`待校对 ${pending} / ${total} 处`:`已校对 ${total} 处`;
         this.elements.previous.disabled = this.elements.next.disabled = !total;
+        this.elements.confirmRemaining.disabled=!pending;
     }
     activate(index, moveFocus = true) {
         if (index == null || !this.buttons.has(index)) return;
@@ -112,6 +116,14 @@ export class ReviewView {
     }
     move(step) {
         if (this.document) this.activate(this.document.next(this.active, step));
+    }
+    confirmRemaining() {
+        if(!this.document || !this.document.pending)return;
+        this.document.confirmRemaining();
+        for(const index of this.document.positions)this.updateWord(index);
+        this.elements.picker.hidden=true;
+        if(this.active!=null){const button=this.buttons.get(this.active);button.classList.remove('is-active');button.setAttribute('aria-expanded','false');}
+        this.updateStatus();this.onChange(this.document);
     }
     choose(value) {
         if (this.active == null || !this.document) return;

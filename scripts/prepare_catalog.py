@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 """Compile one simplified-glyph dictionary; unreviewed extra relations stay inactive."""
 from pathlib import Path
-from collections import defaultdict
+from collections import defaultdict,Counter
 import argparse,json,re,unicodedata
 from reference_policy import select_reference
 
@@ -51,20 +51,26 @@ def compile_catalog(cache,output):
     for c,targets in to_simple.items():
         add(c,targets,'规范字表附表：繁体、异体到规范字')
         if c in standard and targets-{c}:hold(c,targets|{c},'两端均为规范字，需确认')
+    formal_edges={c:set(values) for c,values in edges.items()}
     ts,risk=raw_table('TSCharacters.txt');st,_=raw_table('STCharacters.txt')
-    inferred=defaultdict(set)
+    inferred=defaultdict(set);opencc_targets=defaultdict(set);unicode_targets=defaultdict(set)
     for c,values in ts.items():
         for target in values:
             if han(target) and target!=c and target not in standard and (c in risk or c in st.get(target,[])):inferred[target].add(c)
         targets={t for t in values if t in standard}
+        opencc_targets[c].update(targets)
         if targets and (not edges[c] or not targets<=edges[c]):hold(c,targets,'OpenCC 补充关系尚待核查')
-    for c,origins in inferred.items():hold(c,expand(set(st.get(c,[]))|origins),'OpenCC 反向关系尚待独立核查')
+    for c,origins in inferred.items():
+        targets=expand(set(st.get(c,[]))|origins);opencc_targets[c].update(targets)
+        hold(c,targets,'OpenCC 反向关系尚待独立核查')
     for c,props in properties.items():
         targets={chr(int(v[2:],16)) for v in re.findall(r'U\+[0-9A-F]+',props.get('kZVariant',''))}
         for target in targets:
             if target in standard or target in formal_traditional:
+                unicode_targets[c].update(expand({target}))
                 if not expand({target})<=edges[c]:hold(c,expand({target}),'Unicode 字形变体补充，待核规范字归属')
-    supplements,reference,reference_stats=select_reference(read('moe-regular.json'),read('moe-relations.json'),tiers,formal_traditional,edges,pending,to_simple,ts)
+    regular_rows,reference_rows=read('moe-regular.json'),read('moe-relations.json')
+    supplements,reference,reference_stats=select_reference(regular_rows,reference_rows,tiers,formal_traditional,edges,pending,to_simple,ts)
     for c,values in supplements.items():
         add(c,values,'中国台湾地区教育主管部门异体资料：唯一常用对应，低优先级补充')
         for url in reference['links'][c]:
@@ -81,11 +87,13 @@ def compile_catalog(cache,output):
         if edges[c]:mapping[c]=order(edges[c],c)
     # Manual decisions target the explicit character, matching the previous
     # live dictionary; no implicit replacement of its compatibility aliases.
+    aliases=set()
     for start,end in [(0xF900,0xFAFF),(0x2F800,0x2FA1F)]:
         for point in range(start,end+1):
             alias=chr(point);canonical=unicodedata.normalize('NFC',alias)
             if canonical!=alias and len(canonical)==1 and canonical in mapping and alias not in mapping:
                 mapping[alias]=mapping[canonical]
+                aliases.add(alias)
                 references[alias].append({'label':f'Unicode 规范等价 U+{point:04X}','url':'https://www.unicode.org/reports/tr15/'})
     mapping={c:values for c,values in mapping.items() if values!=[c]}
     punctuation={'︵':'（','︶':'）','︻':'【','︼':'】','﹁':'「','﹂':'」','﹃':'『','﹄':'』','︽':'《','︾':'》','︿':'〈','﹀':'〉'}
@@ -98,10 +106,31 @@ def compile_catalog(cache,output):
     for c,values in decisions['accepted'].items():
         assert len(c)==1 and values and len(set(values))==len(values) and all(len(t)==1 for t in values)
         mapping[c]=values;reviews.pop(c,None)
+        references[c].append({'label':'维护者确认的默认关系（2026-11-27）','url':'https://github.com/RoShioLeo/halo-plugin-glyphlens/blob/main/research/maintainer-decisions.json'})
     for c in decisions['rejected']:
         mapping.pop(c,None);reviews.pop(c,None)
-    counts={'records':len(mapping),'pending':len(reviews),'multi':sum(len(v)>1 for v in mapping.values())}
+    counts={'records':len(mapping),'relations':sum(map(len,mapping.values())),'pending':len(reviews),'multi':sum(len(v)>1 for v in mapping.values())}
+    # Attribute each candidate relation once. A multi-candidate source may have
+    # targets from different sources, so per-source character counts can overlap.
+    def origin(c,target):
+        if c in aliases or c in punctuation:return 'unicode'
+        if target in formal_edges.get(c,set()):return 'mainland'
+        if target in supplements.get(c,[]):return 'variants'
+        if target in opencc_targets.get(c,set()):return 'opencc'
+        if target in unicode_targets.get(c,set()):return 'unicode'
+        if target in reference['mappings'].get(c,[]):return 'variants'
+        return 'curated'
+    source_characters=defaultdict(set);source_relations=Counter()
+    for c,values in mapping.items():
+        for target in values:
+            key=origin(c,target);source_characters[key].add(c);source_relations[key]+=1
+    source_counts={key:{'characters':len(source_characters[key]),'relations':source_relations[key]} for key in ['mainland','unicode','opencc','variants','curated']}
+    assert sum(item['relations'] for item in source_counts.values())==counts['relations']
+    lexicon=json.loads((ROOT/'data/lexicon.json').read_text(encoding='utf-8'))
     summary={'scope':'繁体、异体字到常用简体；单一字库；维护者确认优先','mainland_standard':8105,'formal_traditional':2574,'formal_variants':1023,
+             'version':next(line.split('=',1)[1] for line in (ROOT/'gradle.properties').read_text(encoding='utf-8').splitlines() if line.startswith('version=')),
+             'source_counts':source_counts,
+             'lexicon':{'rules':len(lexicon),'contexts':sum(len(rule['contexts']) for rule in lexicon),'characters':len({rule['character'] for rule in lexicon})},
              'reference_policy':{'simple_max_level':2,'automatic':len(supplements),'excluded':reference_stats},
              'maintainer_decisions':{'accepted':len(decisions['accepted']),'rejected':len(decisions['rejected']),'updated':decisions['updated']},'counts':counts}
     sources={'summary':summary,'links':{'mainland':'https://www.moe.gov.cn/jyb_xwfb/moe_2082/siju/yywzxxgls/ztzl_yywzgfbz/201306/t20130601_186002.html','unicode':'https://www.unicode.org/reports/tr38/','opencc':'https://github.com/BYVoid/OpenCC/tree/fae2a0a911c30764e669a7d8b0591cd8e852934a/data/dictionary','variants':'https://dict.variants.moe.edu.tw/'},

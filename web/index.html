@@ -41,6 +41,7 @@
                 <div class="brand-copy">
                     <p class="brand-kicker">GLYPHLENS</p>
                     <h1>字镜 · 字形转换</h1>
+                    <p class="brand-description">面向历史文献整理的字形转换工具。新字库试运行中，如有问题可通过右下角反馈。</p>
                 </div>
             </div>
             <div class="controls">
@@ -75,6 +76,7 @@
                     <div class="panel-heading">
                         <span id="outputLabel">转换结果</span>
                         <div class="panel-actions">
+                            <button type="button" id="startReview" class="quiet-button" disabled hidden>开始校对</button>
                             <button type="button" id="copyOutput" class="quiet-button" disabled>复制</button>
                             <button type="button" id="downloadOutput" class="quiet-button" disabled>下载</button>
                         </div>
@@ -84,6 +86,7 @@
                         <div class="review-toolbar">
                             <span id="reviewStatus" role="status" aria-live="polite"></span>
                             <div class="review-navigation">
+                                <button type="button" id="confirmRemaining" class="quiet-button" title="按当前显示的字形确认剩余位置">确认剩余</button>
                                 <button type="button" id="previousCandidate" class="quiet-button">上一处</button>
                                 <button type="button" id="nextCandidate" class="quiet-button">下一处</button>
                             </div>
@@ -102,9 +105,11 @@
             </div>
         </main>
         <footer class="source-credit">
-            GlyphLens · LemonSlice ·
-            <a href="https://github.com/RoShioLeo/halo-plugin-glyphlens" target="_blank" rel="noopener noreferrer">源码</a> ·
-            <a href="LICENSE" rel="license">MIT</a>
+            <span>GlyphLens · LemonSlice ·
+                <a href="https://github.com/RoShioLeo/halo-plugin-glyphlens" target="_blank" rel="noopener noreferrer">源码</a> ·
+                <a href="LICENSE" rel="license">MIT</a>
+            </span>
+            <span class="footer-thanks">感谢 @小兽KEMONO 提供技术支持</span>
         </footer>
     </div>
     <button type="button" class="feedback-launcher" id="openFeedback" aria-label="字形反馈" title="字形反馈" aria-haspopup="dialog" aria-controls="feedbackDialog">

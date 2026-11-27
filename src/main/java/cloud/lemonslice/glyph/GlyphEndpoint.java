@@ -32,6 +32,7 @@ public final class GlyphEndpoint implements CustomEndpoint {
             .GET("/dictionary/export",request -> secured(actor -> "reviews".equals(request.queryParam("kind").orElse("")) ? glyphs.reviews() : "overrides".equals(request.queryParam("kind").orElse("")) ? glyphs.state() : glyphs.effective()))
             .GET("/sources",request -> secured(actor -> Mono.just(glyphs.source(request.queryParam("character").orElse("")))))
             .GET("/lexicon",request -> secured(actor -> lexicon.list()))
+            .GET("/lexicon/candidates",request -> secured(actor -> lexicon.candidates(request.queryParam("character").orElse(""))))
             .PUT("/lexicon",request -> secured(actor -> request.bodyToMono(LexiconStore.Request.class).flatMap(body -> lexicon.save(body,actor))))
             .GET("/feedback",request -> secured(actor -> feedback.list()))
             .PUT("/feedback/{id}",request -> secured(actor -> request.bodyToMono(FeedbackStore.Update.class).flatMap(body -> feedback.process(request.pathVariable("id"),body,actor))))

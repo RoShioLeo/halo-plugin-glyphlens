@@ -1,58 +1,43 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GlyphConverter } from '../web/engine.js';
-
-test('default conversion is plain text; review choices are independent occurrences', () => {
-    const converter = new GlyphConverter({'发': ['發', '髮'], A: ['B'], B: ['C']});
-    assert.equal(converter.convert('发发A'), '發發B');
-    const document = converter.review('发发A');
-    const [first, second] = document.positions;
-    assert.equal(document.text(), '發發B');
-    document.choose(second, '髮');
-    assert.equal(document.text(), '發髮B');
-    assert.equal(document.pending, 1);
-    assert.equal(document.reviewed(first), false);
-    document.choose(first, '發');
-    assert.equal(document.pending, 0);
-    assert.equal(document.next(second, 1, true), null);
-    assert.equal(document.next(second), first);
-    assert.equal(document.next(first, -1), second);
-    assert.throws(() => document.choose(first, '发'), /合法候选/);
-    assert.equal(converter.review('发发A').text(), '發發B');
+const rule=(character,candidate,...contexts)=>({character,candidate,contexts});
+test('default results use the first candidate and manual choices belong to individual occurrences',()=>{
+    const converter=new GlyphConverter({'乾':['干','乾'],A:['B'],B:['C']});
+    const doc=converter.review('乾乾A'),[first,second]=doc.positions;
+    assert.equal(doc.text(),'干干B');doc.choose(second,'乾');assert.equal(doc.text(),'干乾B');assert.equal(doc.pending,1);
+    assert.equal(doc.reviewed(first),false);doc.choose(first,'干');assert.equal(doc.pending,0);
+    assert.equal(doc.next(second,1,true),null);assert.equal(doc.next(second),first);assert.equal(doc.next(first,-1),second);
+    assert.throws(()=>doc.choose(first,'幹'),/合法候选/);assert.equal(converter.review('乾乾A').text(),'干干B');
 });
-
-test('review preserves exact unknown glyph sequences, line endings and literal markup', () => {
-    const converter = new GlyphConverter({'干': ['干', '幹'], '𠀀': ['一', '壹']});
-    const input = '干\r\n𠀀 干\u{E0100} e\u0301 👩‍💻 <script>【原文】</script>';
-    const document = converter.review(input);
-    assert.equal(document.positions.length, 2);
-    document.choose(document.positions[0], '幹');
-    document.choose(document.positions[1], '壹');
-    assert.equal(document.text(), '幹\r\n壹 干\u{E0100} e\u0301 👩‍💻 <script>【原文】</script>');
+test('review preserves exact unknown glyph sequences, line endings and literal markup',()=>{
+    const doc=new GlyphConverter({'乾':['干','乾'],'𠀀':['一','壹']}).review('乾\r\n𠀀 乾\u{E0100} e\u0301 👩‍💻 <script>【原文】</script>');
+    assert.equal(doc.positions.length,2);doc.choose(doc.positions[0],'乾');doc.choose(doc.positions[1],'壹');
+    assert.equal(doc.text(),'乾\r\n壹 乾\u{E0100} e\u0301 👩‍💻 <script>【原文】</script>');
 });
-
-test('lexicon-resolved positions do not require review; conflicts only expose approved candidates', () => {
-    const converter = new GlyphConverter({'干': ['干', '乾', '幹']}, [
-        {phrase: '干燥', choices: [{offset: 0, source: '干', target: '乾'}]},
-        {phrase: '干事', choices: [{offset: 0, source: '干', target: '乾'}]},
-        {phrase: '干事', choices: [{offset: 0, source: '干', target: '幹'}]},
-    ]);
-    const document = converter.review('干燥 干事 干');
-    assert.equal(document.positions.length, 2);
-    assert.equal(document.text(), converter.convert('干燥 干事 干'));
-    assert.deepEqual(document.parts[document.positions[0]].candidates, ['乾', '幹']);
-    assert.throws(() => document.choose(document.positions[0], '干'), /合法候选/);
-    converter.install({}, converter.lexicon.rules);
-    assert.equal(converter.review('干燥').positions.length, 0);
-    assert.equal(converter.review('干燥').text(), '干燥');
+test('dictionary suggestions remain unreviewed and preserve original candidates for manual overrides',()=>{
+    const converter=new GlyphConverter({'乾':['干','乾']},[rule('乾','乾','乾坤')]);
+    const doc=converter.review('乾坤 乾'),[matched,pending]=doc.positions;
+    assert.equal(doc.text(),'乾坤 干');assert.equal(doc.pending,2);assert.equal(doc.reviewed(matched),false);assert.equal(doc.matched(matched),true);
+    assert.deepEqual(doc.parts[matched].candidates,['干','乾']);assert.equal(doc.next(null,1,true),matched);
+    doc.choose(matched,'干');assert.equal(doc.text(),'干坤 干');assert.equal(doc.reviewed(matched),true);assert.equal(doc.matched(matched),true);
+    assert.equal(doc.pending,1);assert.equal(doc.matchedCount,1);
 });
-
-test('next pending occurrence skips confirmed choices and wraps once', () => {
-    const document = new GlyphConverter({'乾': ['乾', '干']}).review('乾，乾，乾');
-    const [first, second, third] = document.positions;
-    document.choose(second, '干');
-    assert.equal(document.next(first, 1, true), third);
-    assert.equal(document.next(third, 1, true), first);
-    assert.equal(document.next(first, -1, true), third);
-    assert.equal(new GlyphConverter({}).review('').next(null), null);
+test('conflicts retain candidate access and cannot silently mark a position reviewed',()=>{
+    const converter=new GlyphConverter({'乾':['干','乾','幹']},[rule('乾','幹','幹事'),rule('乾','乾','乾事')]);
+    const doc=converter.review('乾事');assert.equal(doc.text(),'干事');assert.equal(doc.pending,1);assert.equal(doc.reviewed(doc.positions[0]),false);
+    doc.choose(doc.positions[0],'幹');assert.equal(doc.text(),'幹事');assert.equal(doc.pending,0);
+});
+test('confirm remaining accepts currently displayed results without changing manual or dictionary choices',()=>{
+    const doc=new GlyphConverter({'乾':['干','乾']},[rule('乾','乾','乾坤')]).review('乾坤 乾 乾');
+    const [automatic,manual,pending]=doc.positions;doc.choose(manual,'乾');const before=doc.text();
+    assert.equal(doc.pending,2);assert.equal(doc.confirmRemaining(),2);assert.equal(doc.text(),before);assert.equal(doc.pending,0);
+    assert.equal(doc.matched(automatic),true);assert.equal(doc.reviewed(automatic),true);assert.equal(doc.value(manual),'乾');assert.equal(doc.value(pending),'干');assert.equal(doc.confirmRemaining(),0);
+    doc.choose(pending,'乾');assert.equal(doc.text(),'乾坤 乾 乾');
+});
+test('pending navigation skips only user-confirmed positions and wraps once',()=>{
+    const doc=new GlyphConverter({'乾':['干','乾']},[rule('乾','乾','乾坤')]).review('乾 乾坤 乾 乾');
+    const [first,automatic,second,third]=doc.positions;doc.choose(second,'乾');
+    assert.equal(doc.next(first,1,true),automatic);assert.equal(doc.next(automatic,1,true),third);assert.equal(doc.next(third,1,true),first);assert.equal(doc.next(first,-1,true),third);
+    assert.equal(doc.next(first),automatic);assert.equal(doc.matched(automatic),true);assert.equal(doc.reviewed(automatic),false);assert.equal(new GlyphConverter({}).review('').next(null),null);
 });

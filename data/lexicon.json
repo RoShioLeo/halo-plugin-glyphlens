@@ -1,0 +1,277 @@
+[
+  {
+    "id": "default-qian-gan",
+    "character": "乾",
+    "candidate": "干",
+    "contexts": [
+      "干燥",
+      "干净",
+      "干旱",
+      "干枯",
+      "干涸",
+      "干裂",
+      "晒干",
+      "烘干",
+      "风干",
+      "晾干",
+      "饼干"
+    ],
+    "note": "干燥及干制用法",
+    "sources": [
+      "https://dict.revised.moe.edu.tw/dictView.jsp?ID=69957"
+    ]
+  },
+  {
+    "id": "default-qian-qian",
+    "character": "乾",
+    "candidate": "乾",
+    "contexts": [
+      "乾坤",
+      "乾隆",
+      "乾卦"
+    ],
+    "note": "卦名及专名",
+    "sources": [
+      "https://dict.revised.moe.edu.tw/dictView.jsp?ID=99107",
+      "https://img.dpm.org.cn/Uploads/pdf/2229/T00003_00.pdf"
+    ]
+  },
+  {
+    "id": "default-pang-fang",
+    "character": "彷",
+    "candidate": "仿",
+    "contexts": [
+      "仿佛"
+    ],
+    "note": "仿佛的常用写法",
+    "sources": [
+      "https://dict.revised.moe.edu.tw/appendix.jsp?ID=26&la=0&page=28&powerMode=0"
+    ]
+  },
+  {
+    "id": "default-pang-pang",
+    "character": "彷",
+    "candidate": "彷",
+    "contexts": [
+      "彷徨"
+    ],
+    "note": "彷徨用法",
+    "sources": [
+      "https://dict.revised.moe.edu.tw/dictView.jsp?ID=24002"
+    ]
+  },
+  {
+    "id": "default-shen-chen",
+    "character": "沈",
+    "candidate": "沉",
+    "contexts": [
+      "沉没",
+      "沉默",
+      "沉淀",
+      "沉重",
+      "沉睡",
+      "沉静",
+      "沉思",
+      "深沉",
+      "低沉",
+      "消沉",
+      "沉迷",
+      "沉浸",
+      "沉醉"
+    ],
+    "note": "下沉及沉静等用法",
+    "sources": [
+      "https://dict.revised.moe.edu.tw/search.jsp?la=0&md=1&powerMode=0&word=%E6%B2%89"
+    ]
+  },
+  {
+    "id": "default-shen-shen",
+    "character": "沈",
+    "candidate": "沈",
+    "contexts": [
+      "沈阳",
+      "沈括"
+    ],
+    "note": "地名及人名",
+    "sources": [
+      "https://dict.revised.moe.edu.tw/dictView.jsp?ID=8981&ver=4"
+    ]
+  },
+  {
+    "id": "default-liao-le",
+    "character": "瞭",
+    "candidate": "了",
+    "contexts": [
+      "了解",
+      "了然",
+      "明了"
+    ],
+    "note": "了解及明了用法",
+    "sources": [
+      "https://dict.revised.moe.edu.tw/dictView.jsp?ID=3553"
+    ]
+  },
+  {
+    "id": "default-liao-liao",
+    "character": "瞭",
+    "candidate": "瞭",
+    "contexts": [
+      "瞭望",
+      "瞭望台"
+    ],
+    "note": "远望用法",
+    "sources": [
+      "https://dict.revised.moe.edu.tw/dictView.jsp?ID=63244"
+    ]
+  },
+  {
+    "id": "default-jie-jie",
+    "character": "藉",
+    "candidate": "借",
+    "contexts": [
+      "借口",
+      "借助",
+      "借鉴",
+      "凭借",
+      "借用"
+    ],
+    "note": "借用及凭借用法",
+    "sources": [
+      "https://dict.revised.moe.edu.tw/dictView.jsp?ID=5607&ver=4"
+    ]
+  },
+  {
+    "id": "default-jie-ji",
+    "character": "藉",
+    "candidate": "藉",
+    "contexts": [
+      "慰藉",
+      "狼藉",
+      "蕴藉"
+    ],
+    "note": "保留藉的常用词",
+    "sources": [
+      "https://dict.revised.moe.edu.tw/dictView.jsp?ID=161428",
+      "https://dict.revised.moe.edu.tw/dictView.jsp?ID=5607&ver=4"
+    ]
+  },
+  {
+    "id": "default-fu-fu",
+    "character": "覆",
+    "candidate": "复",
+    "contexts": [
+      "答复",
+      "回复",
+      "反复",
+      "复信",
+      "批复"
+    ],
+    "note": "答复及反复用法",
+    "sources": [
+      "https://dict.revised.moe.edu.tw/dictView.jsp?ID=1884"
+    ]
+  },
+  {
+    "id": "default-fu-cover",
+    "character": "覆",
+    "candidate": "覆",
+    "contexts": [
+      "覆盖",
+      "覆灭",
+      "颠覆",
+      "覆辙",
+      "倾覆"
+    ],
+    "note": "覆盖及翻覆等用法",
+    "sources": [
+      "https://dict.revised.moe.edu.tw/dictView.jsp?ID=1884"
+    ]
+  },
+  {
+    "id": "default-zha-zha",
+    "character": "吒",
+    "candidate": "咤",
+    "contexts": [
+      "叱咤",
+      "叱咤风云"
+    ],
+    "note": "叱咤用法",
+    "sources": [
+      "https://dict.revised.moe.edu.tw/dictView.jsp?ID=7664"
+    ]
+  },
+  {
+    "id": "default-zha-name",
+    "character": "吒",
+    "candidate": "吒",
+    "contexts": [
+      "哪吒"
+    ],
+    "note": "专名保留吒",
+    "sources": [
+      "https://dict.revised.moe.edu.tw/dictView.jsp?ID=58494"
+    ]
+  },
+  {
+    "id": "default-zheng-zheng",
+    "character": "徵",
+    "candidate": "征",
+    "contexts": [
+      "象征",
+      "特征",
+      "征求",
+      "征收",
+      "征兆",
+      "征用",
+      "征文",
+      "征询"
+    ],
+    "note": "征求及征象等用法",
+    "sources": [
+      "https://dict.revised.moe.edu.tw/dictView.jsp?ID=7943"
+    ]
+  },
+  {
+    "id": "default-zheng-zhi",
+    "character": "徵",
+    "candidate": "徵",
+    "contexts": [
+      "宫商角徵羽"
+    ],
+    "note": "五音中的徵",
+    "sources": [
+      "https://dict.revised.moe.edu.tw/dictView.jsp?ID=7557"
+    ]
+  },
+  {
+    "id": "default-hua-hua",
+    "character": "畫",
+    "candidate": "画",
+    "contexts": [
+      "绘画",
+      "画家",
+      "图画",
+      "画像",
+      "画面",
+      "画作"
+    ],
+    "note": "绘画及图画用法",
+    "sources": [
+      "https://dict.revised.moe.edu.tw/dictView.jsp?ID=85526"
+    ]
+  },
+  {
+    "id": "default-hua-hua-plan",
+    "character": "畫",
+    "candidate": "划",
+    "contexts": [
+      "计划",
+      "规划",
+      "策划"
+    ],
+    "note": "计划类常用写法",
+    "sources": [
+      "https://www.moe.gov.cn/ewebeditor/uploadfile/2015/01/12/20150112165927212.pdf"
+    ]
+  }
+]

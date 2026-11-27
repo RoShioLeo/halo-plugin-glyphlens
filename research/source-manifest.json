@@ -67,7 +67,15 @@
   "maintainer-decisions": {
     "file": "maintainer-decisions.json",
     "updated": "2026-11-27",
-    "sha256": "2a481bfd3c47508ed03b1d925ce8e192be6223954662d9254120e267faa61614",
+    "sha256": "cb729360aa320a79cf4e3dbf61a0fd85b6c12b588d0e67d1f6b983745d4d129e",
     "use": "Maintainer-confirmed defaults and excluded relations; no accounts or live audit history."
+  },
+  "default-context-lexicon": {
+    "file": "../data/lexicon.json",
+    "updated": "2026-11-27",
+    "sha256": "2987f7a57863bb7622fa29e03bcce06ec6ae5b404d2a22538c840305fa69c32b",
+    "rules": 18,
+    "contexts": 75,
+    "use": "Maintainer-curated simplified context words for existing single-character candidates; source links only, no copied definitions or examples."
   }
 }

@@ -62,6 +62,12 @@
       "moe-relations.json"
     ],
     "checksums": "inputs-manifest.json",
-    "use": "Low-priority unique common-target supplements and administrator-entered corroboration; protects standard and regular source characters; no new review queue."
+    "use": "Low-priority unique common simplified-target supplements and administrator-entered corroboration; protects standard and regular source characters; no traditional conversion output."
+  },
+  "maintainer-decisions": {
+    "file": "maintainer-decisions.json",
+    "updated": "2026-11-27",
+    "sha256": "2a481bfd3c47508ed03b1d925ce8e192be6223954662d9254120e267faa61614",
+    "use": "Maintainer-confirmed defaults and excluded relations; no accounts or live audit history."
   }
 }

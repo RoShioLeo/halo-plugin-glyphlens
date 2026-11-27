@@ -4,189 +4,103 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { Dialog, Toast, VButton, VCard, VEmpty, VLoading, VModal, VPageHeader } from '@halo-dev/components';
 import { unicodeInput, unicodeCodes } from './unicode';
 import { batchAction, mappingStatus } from './selection';
+import { request } from './api';
 import LexiconView from './LexiconView.vue';
 import FeedbackView from './FeedbackView.vue';
 import SourcesView from './SourcesView.vue';
 
-const api = '/apis/console.api.glyphlens.lemonslice.cloud/v1alpha1/dictionaries';
-const section = ref('glyphs');
-const option = ref('v2s');
-const query = ref('');
-const source = ref('all');
-const page = ref(1);
-const result = ref({items: [], total: 0, version: null, effectiveCount: 0, changedCount: 0});
-const loading = ref(false);
-const saving = ref(false);
-const selected = ref([]);
-const selectable = computed(() => result.value.items);
-const selectedAction = computed(() => batchAction(result.value.items, selected.value));
-const actionLabels = {disable:'停用',enable:'启用',approve:'审核'};
-const batchReview = reactive({visible:false, rows:[], option:'v2s', version:null, confirmed:false});
-const allSelected = computed(() => selectable.value.length > 0 && selectable.value.every(row => selected.value.includes(row.character)));
-const error = ref('');
-const editorVisible = ref(false);
-const historyVisible = ref(false);
-const history = ref([]);
-const sourceVisible = ref(false);
-const sourceRecords = ref([]);
-const edit = reactive({character: '', candidates: '', simplified:'', traditional:'', kind:'variant', note: '', existing: false, version: null, option: 'v2s', pending:false, confirmed:false, reasons:[], links:[]});
-const variantMode = computed(() => !edit.existing && edit.kind === 'variant');
-const variantPreview = ref(null), previewLoading = ref(false), previewError = ref('');
-const lines = value => value.split('\n').map(value => value.trim()).filter(Boolean);
-const variantBody = () => ({character:edit.character, simplified:lines(edit.simplified), traditional:lines(edit.traditional), note:edit.note});
-let previewSequence=0, previewTimer;
-watch(() => [editorVisible.value, edit.existing, edit.kind, edit.character, edit.simplified, edit.traditional], () => {
-    const ticket=++previewSequence;
-    clearTimeout(previewTimer);variantPreview.value=null;previewError.value='';previewLoading.value=false;edit.confirmed=false;
-    if(!editorVisible.value || !variantMode.value || !edit.character.trim() || (!lines(edit.simplified).length && !lines(edit.traditional).length)) return;
-    previewLoading.value=true;
-    previewTimer=setTimeout(async () => {
-        try {
-            const data=await request(`${api}/variant/preview`,{method:'POST',body:JSON.stringify(variantBody())});
-            if(ticket===previewSequence) variantPreview.value=data;
-        } catch(failure) { if(ticket===previewSequence) previewError.value=failure.message; }
-        finally { if(ticket===previewSequence) previewLoading.value=false; }
-    },200);
-}, {flush:'sync'});
-const candidatePreview = computed(() => edit.candidates.split('\n').filter(value => value.trim()).map(value => {
-    try { const character = unicodeInput(value); return {character, code: unicodeCodes(character)}; }
-    catch (failure) { return {error: failure.message}; }
+const section=ref('glyphs'),query=ref(''),source=ref('all'),page=ref(1);
+const result=ref({items:[],total:0,version:null,effectiveCount:0,changedCount:0});
+const loading=ref(false),saving=ref(false),selected=ref([]),error=ref('');
+const editorVisible=ref(false),historyVisible=ref(false),history=ref([]),sourceVisible=ref(false),sourceRecords=ref([]);
+const selectable=computed(()=>result.value.items);
+const selectedAction=computed(()=>batchAction(result.value.items,selected.value));
+const actionLabels={disable:'停用',enable:'启用',approve:'审核'};
+const batchReview=reactive({visible:false,rows:[],version:null,confirmed:false});
+const allSelected=computed(()=>selectable.value.length>0 && selectable.value.every(row=>selected.value.includes(row.character)));
+const edit=reactive({character:'',candidates:'',note:'',existing:false,version:null,pending:false,confirmed:false,reasons:[],links:[]});
+const candidatePreview=computed(()=>edit.candidates.split('\n').filter(value=>value.trim()).map(value=>{
+    try { const character=unicodeInput(value);return {character,code:unicodeCodes(character)}; }
+    catch(failure) { return {error:failure.message}; }
 }));
-const characterPreview = computed(() => {
-    try { return unicodeInput(edit.character); } catch (_) { return ''; }
-});
-let sequence = 0;
-
-async function request(url, init = {}) {
-    const csrfCookie = document.cookie.split('; ').find(cookie => cookie.startsWith('XSRF-TOKEN='));
-    const headers = {Accept: 'application/json', ...init.headers};
-    if (init.body) headers['Content-Type'] = 'application/json';
-    if (csrfCookie) headers['X-XSRF-TOKEN'] = decodeURIComponent(csrfCookie.slice('XSRF-TOKEN='.length));
-    const response = await fetch(url, {...init, headers, credentials: 'same-origin'});
-    if (!response.ok) {
-        const problem = await response.json().catch(() => ({}));
-        throw new Error(response.status === 403 || response.status === 401 ? '仅超级管理员可以管理字库' : response.status === 409 ? '字库已被修改，请刷新后重新确认' : problem.detail || '操作失败，请重试');
-    }
-    return response.json();
-}
-
+const characterPreview=computed(()=>{try{return unicodeInput(edit.character);}catch(_){return '';}});
+let sequence=0;
 async function load() {
-    const ticket = ++sequence;
-    loading.value = true;
-    error.value = '';
+    const ticket=++sequence;loading.value=true;error.value='';
     try {
-        const params = new URLSearchParams({query: unicodeInput(query.value), source: source.value, page: String(page.value), size: '50'});
-        const data = await request(`${api}/${option.value}?${params}`);
-        if (ticket === sequence) { result.value = data; selected.value = []; }
-    } catch (failure) { if (ticket === sequence) error.value = failure.message; }
-    finally { if (ticket === sequence) loading.value = false; }
+        const params=new URLSearchParams({query:unicodeInput(query.value),source:source.value,page:String(page.value),size:'50'});
+        const data=await request('/dictionary?'+params);
+        if(ticket===sequence) {result.value=data;selected.value=[];}
+    } catch(failure) {if(ticket===sequence)error.value=failure.message;}
+    finally {if(ticket===sequence)loading.value=false;}
 }
-
-watch([option, source], () => { page.value = 1; editorVisible.value = false; load(); });
+watch(source,()=>{page.value=1;editorVisible.value=false;load();});
 onMounted(load);
-function search() { page.value = 1; load(); }
-function toggleAll() { selected.value = allSelected.value ? [] : selectable.value.map(row => row.character); }
-async function saveBatch(action, characters, selectedOption, version, confirmed=false) {
+function search(){page.value=1;load();}
+function toggleAll(){selected.value=allSelected.value?[]:selectable.value.map(row=>row.character);}
+async function saveBatch(action,characters,version,confirmed=false) {
     saving.value=true;
     try {
-        await request(`${api}/${selectedOption}/batch`, {method:'PUT',body:JSON.stringify({action,characters,version,confirmed})});
-        batchReview.visible=false;
-        Toast.success('已保存');await load();
-    } catch(failure) { Toast.error(failure.message); }
-    finally { saving.value=false; }
+        await request('/dictionary/batch',{method:'PUT',body:JSON.stringify({action,characters,version,confirmed})});
+        batchReview.visible=false;Toast.success('已保存');await load();
+    } catch(failure){Toast.error(failure.message);}
+    finally{saving.value=false;}
 }
 function applySelected() {
-    if (!selectedAction.value || saving.value) return;
-    const action=selectedAction.value;
-    const characters = [...selected.value];
-    const selectedOption = option.value;
-    const version = result.value.version ?? null;
+    if(!selectedAction.value || saving.value)return;
+    const action=selectedAction.value,characters=[...selected.value],version=result.value.version??null;
     if(action==='approve') {
-        Object.assign(batchReview,{visible:true,rows:result.value.items.filter(row=>characters.includes(row.character)),option:selectedOption,version,confirmed:false});
-        return;
+        Object.assign(batchReview,{visible:true,rows:result.value.items.filter(row=>characters.includes(row.character)),version,confirmed:false});return;
     }
-    Dialog.warning({
-        title: `${actionLabels[action]}所选 ${characters.length} 项映射？`,
-        description: action==='enable' ? '重新启用停用前保存的规则，待审候选仍需单独审核。' : selectedOption === 'common' ? '停用所选通用映射。方向表的有效规则仍会生效。' : '停用所选方向规则后使用通用映射，没有通用映射则保留原字。',
-        confirmText: actionLabels[action], cancelText: '取消', showCancel: true,
-        onConfirm: () => saveBatch(action,characters,selectedOption,version)
-    });
+    Dialog.warning({title:actionLabels[action]+'所选 '+characters.length+' 项映射？',
+        description:action==='enable'?'重新启用停用前保存的规则，待审候选仍需单独审核。':'停用后保留原字。',
+        confirmText:actionLabels[action],cancelText:'取消',showCancel:true,onConfirm:()=>saveBatch(action,characters,version)});
 }
 function openEditor(row) {
-    Object.assign(edit, {character: row?.character || '', candidates: (row?.savedCandidates || (row?.reviewRequired ? row.reviewCandidates : row?.candidates) || []).join('\n'),
-        note: row?.note || '', existing: !!row, version: result.value.version ?? null, option: option.value,
-        pending:!!row?.reviewRequired,confirmed:false,reasons:row?.reviewReasons || [],links:row?.reviewLinks || [],
-        kind:option.value==='common'?'common':'variant',simplified:'',traditional:''});
-    editorVisible.value = true;
+    Object.assign(edit,{character:row?.character||'',candidates:(row?.savedCandidates||(row?.reviewRequired?row.reviewCandidates:row?.candidates)||[]).join('\n'),
+        note:row?.note||'',existing:!!row,version:result.value.version??null,pending:!!row?.reviewRequired,confirmed:false,reasons:row?.reviewReasons||[],links:row?.reviewLinks||[]});
+    editorVisible.value=true;
 }
 async function save() {
-    if(variantMode.value) {
-        if(!variantPreview.value || previewLoading.value) { Toast.error(previewError.value || '填写原字及至少一种候选字'); return; }
-        if(variantPreview.value.confirmationRequired && !edit.confirmed) { Toast.error('请确认待审或停用的映射'); return; }
-        saving.value=true;
-        try {
-            await request(`${api}/variant`,{method:'PUT',body:JSON.stringify({...variantBody(),version:variantPreview.value.version,confirmed:edit.confirmed})});
-            editorVisible.value=false;Toast.success('已保存');await load();
-        } catch(failure) { Toast.error(failure.message); }
-        finally { saving.value=false; }
-        return;
-    }
-    if(edit.pending && !edit.confirmed) { Toast.error('请先确认字形关系及候选顺序'); return; }
-    saving.value = true;
+    if(edit.pending && !edit.confirmed){Toast.error('请先确认字形关系及候选顺序');return;}
+    saving.value=true;
     try {
-        await request(`${api}/${edit.existing ? edit.option : 'common'}/entries`, {method: 'PUT', body: JSON.stringify({character: edit.character,
-            candidates: edit.candidates.split('\n').map(value => value.trim()).filter(Boolean), note: edit.note,
-            action: edit.pending ? 'approve' : 'override', confirmed:edit.confirmed, version: edit.version})});
-        editorVisible.value = false;
-        Toast.success('已保存');
-        await load();
-    } catch (failure) { Toast.error(failure.message); }
-    finally { saving.value = false; }
+        await request('/dictionary/entries',{method:'PUT',body:JSON.stringify({character:edit.character,candidates:edit.candidates.split('\n').map(value=>value.trim()).filter(Boolean),
+            note:edit.note,action:edit.pending?'approve':'override',confirmed:edit.confirmed,version:edit.version})});
+        editorVisible.value=false;Toast.success('已保存');await load();
+    } catch(failure){Toast.error(failure.message);}
+    finally{saving.value=false;}
 }
-function change(row, action) {
-    const selectedOption = action === 'reset' && row.scope === 'common' ? 'common' : option.value;
-    const version = result.value.version ?? null;
-    Dialog.warning({
-        title: action === 'disable' ? `停用「${row.character}」的映射？` : action === 'enable' ? `启用「${row.character}」的映射？` : `重置「${row.character}」的映射？`,
-        description: action === 'enable' ? '重新启用停用前保存的规则。' : action === 'disable' ? selectedOption === 'common' ? '停用通用映射，方向表的有效规则仍会生效。' : '停用方向规则后使用通用映射，没有通用映射则保留原字。' : '将恢复本表的基础映射。',
-        confirmText: '确认', cancelText: '取消', showCancel: true,
-        onConfirm: async () => {
-            saving.value = true;
-            try {
-                await request(`${api}/${selectedOption}/entries`, {method: 'PUT', body: JSON.stringify({character: row.character, action, version, note: '', confirmed: false})});
-                Toast.success('已保存');
-                await load();
-            } catch (failure) { Toast.error(failure.message); }
-            finally { saving.value = false; }
-        }
-    });
+function change(row,action) {
+    const version=result.value.version??null;
+    Dialog.warning({title:(action==='disable'?'停用':action==='enable'?'启用':'重置')+'「'+row.character+'」的映射？',
+        description:action==='enable'?'重新启用停用前保存的规则。':action==='disable'?'停用后保留原字。':'将恢复默认字库中的映射。',
+        confirmText:'确认',cancelText:'取消',showCancel:true,onConfirm:async()=>{
+            saving.value=true;
+            try{await request('/dictionary/entries',{method:'PUT',body:JSON.stringify({character:row.character,action,version,note:'',confirmed:false})});Toast.success('已保存');await load();}
+            catch(failure){Toast.error(failure.message);}finally{saving.value=false;}
+        }});
 }
-async function showHistory() {
-    try { history.value = await request(`${api}/${option.value}/history`); historyVisible.value = true; }
-    catch (failure) { Toast.error(failure.message); }
-}
+async function showHistory(){try{history.value=await request('/dictionary/history');historyVisible.value=true;}catch(failure){Toast.error(failure.message);}}
 async function download(kind) {
     try {
-        const data = await request(`${api}/${option.value}/export?kind=${kind}`);
-        const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], {type: 'application/json;charset=utf-8'}));
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = option.value + (kind === 'reviews' ? '-待确认关系' : kind === 'overrides' ? '-修正记录' : '-字库') + '.json';
-        link.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (failure) { Toast.error(failure.message); }
+        const data=await request('/dictionary/export?kind='+kind);
+        const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json;charset=utf-8'}));
+        const link=document.createElement('a');link.href=url;link.download='字镜'+(kind==='reviews'?'-待确认关系':kind==='overrides'?'-修正记录':'-字库')+'.json';link.click();
+        setTimeout(()=>URL.revokeObjectURL(url),1000);
+    } catch(failure){Toast.error(failure.message);}
 }
-const formatCandidates = values => values?.length ? values.join(' / ') : '保持原字';
-const pendingCandidates = row => row.pending ? row.reviewCandidates.filter(value => !row.candidates.includes(value)) : [];
-const rowStatus = mappingStatus;
-const rowStatusLabel = row => ({disabled:'停用',pending:'待审',enabled:'启用'})[rowStatus(row)];
-const rowSource = row => row.source === 'supplement' ? '基础补充' : row.source === 'custom' || row.source === 'disabled' ? '自定义修正' : row.source === 'pending' ? '来源资料' : '基础字库';
-const formatTime = value => value ? new Date(value).toLocaleString('zh-CN') : '初始修正';
-function openPublic() { window.open('/tools/glyphlens/', '_blank', 'noopener,noreferrer'); }
-function submitEditor() { document.getElementById('char-edit-form')?.requestSubmit(); }
+const formatCandidates=values=>values?.length?values.join(' / '):'保持原字';
+const pendingCandidates=row=>row.pending?row.reviewCandidates.filter(value=>!row.candidates.includes(value)):[];
+const rowStatus=mappingStatus;
+const rowStatusLabel=row=>({disabled:'停用',pending:'待审',enabled:'启用'})[rowStatus(row)];
+const rowSource=row=>row.source==='supplement'?'基础补充':row.source==='custom'||row.source==='disabled'?'自定义修正':row.source==='pending'?'来源资料':'默认字库';
+const formatTime=value=>value?new Date(value).toLocaleString('zh-CN'):'初始修正';
+function openPublic(){window.open('/tools/glyphlens/','_blank','noopener,noreferrer');}
+function submitEditor(){document.getElementById('char-edit-form')?.requestSubmit();}
 async function showSources(row) {
-    try { const data=await request(api.replace('/dictionaries','')+'/sources?'+new URLSearchParams({direction:option.value,character:row.character}));sourceRecords.value=data.records;sourceVisible.value=true; }
-    catch(failure) { Toast.error(failure.message); }
+    try{const data=await request('/sources?'+new URLSearchParams({character:row.character}));sourceRecords.value=data.records;sourceVisible.value=true;}
+    catch(failure){Toast.error(failure.message);}
 }
 </script>
 
@@ -212,10 +126,6 @@ async function showSources(row) {
         <template v-if="section === 'glyphs'">
         <VCard>
             <div class="filters">
-                <div class="filter-field">
-                    <label for="char-filter-option">字库</label>
-                    <FormKit id="char-filter-option" v-model="option" type="select" outer-class="char-filter-control" :options="[{label:'通用字形',value:'common'},{label: '简体字', value: 'v2s'}, {label: '繁体字', value: 'v2t'}]" />
-                </div>
                 <div class="filter-field">
                     <label for="char-filter-source">范围</label>
                     <FormKit id="char-filter-source" v-model="source" type="select" outer-class="char-filter-control" :options="[{label: '全部字形', value: 'all'}, {label: '自定义修正', value: 'changed'},{label:'待确认关系',value:'pending'}]" />
@@ -257,7 +167,7 @@ async function showSources(row) {
                                 <VButton size="xs" :disabled="saving" @click="openEditor(row)">{{ row.pending ? '审核' : '编辑' }}</VButton>
                                 <VButton v-if="row.source !== 'disabled'" size="xs" :disabled="saving" @click="change(row, 'disable')">停用</VButton>
                                 <VButton v-if="row.source === 'disabled'" size="xs" :disabled="saving" @click="change(row, 'enable')">启用</VButton>
-                                <VButton v-if="['custom','common-custom','disabled'].includes(row.source)" size="xs" :disabled="saving" @click="change(row, 'reset')">重置</VButton>
+                                <VButton v-if="['custom','disabled'].includes(row.source)" size="xs" :disabled="saving" @click="change(row, 'reset')">重置</VButton>
                                 <VButton size="xs" @click="showSources(row)">来源</VButton>
                             </div></td>
                         </tr>
@@ -273,43 +183,23 @@ async function showSources(row) {
         <VModal :visible="batchReview.visible" title="审核映射" :width="640" @close="batchReview.visible = false">
             <div class="history table-wrap"><table><thead><tr><th>原字</th><th>确认后的候选顺序</th></tr></thead><tbody><tr v-for="row in batchReview.rows" :key="row.character"><td class="character">{{ row.character }}</td><td>{{ row.reviewCandidates.join(' / ') }}<small v-for="reason in row.reviewReasons" :key="reason">{{ reason }}</small></td></tr></tbody></table></div>
             <label class="batch-confirm"><input type="checkbox" v-model="batchReview.confirmed" :disabled="saving">已核对所选映射及候选顺序</label>
-            <div class="editor-actions"><VButton :disabled="saving" @click="batchReview.visible=false">取消</VButton><VButton type="primary" :loading="saving" :disabled="!batchReview.confirmed || saving" @click="saveBatch('approve',batchReview.rows.map(row=>row.character),batchReview.option,batchReview.version,true)">确认</VButton></div>
+            <div class="editor-actions"><VButton :disabled="saving" @click="batchReview.visible=false">取消</VButton><VButton type="primary" :loading="saving" :disabled="!batchReview.confirmed || saving" @click="saveBatch('approve',batchReview.rows.map(row=>row.character),batchReview.version,true)">确认</VButton></div>
         </VModal>
         <VModal :visible="editorVisible" :title="edit.existing ? '编辑映射' : '新增映射'" :width="560" @close="editorVisible = false">
             <FormKit id="char-edit-form" type="form" :actions="false" :disabled="saving" @submit="save">
-                <FormKit v-if="!edit.existing" v-model="edit.kind" type="select" label="类型" :options="[{label:'通用',value:'common'},{label:'繁简',value:'variant'}]" />
                 <div v-if="edit.pending" class="review-note"><p v-for="reason in edit.reasons" :key="reason">{{ reason }}</p><a v-for="(url,index) in edit.links" :key="url" :href="url" target="_blank" rel="noopener noreferrer">来源 {{ index+1 }} </a></div>
                 <FormKit v-model="edit.character" type="text" label="原字" validation="required" :delay="0" :disabled="edit.existing" :help="edit.existing ? undefined : '支持字形、U+4E00、0x4E00、4E00'" />
                 <div v-if="!edit.existing && characterPreview" class="edit-preview"><span class="glyph"><span class="character">{{ characterPreview }}</span><small>{{ unicodeCodes(characterPreview) }}</small></span></div>
-                <template v-if="variantMode">
-                    <div class="variant-fields">
-                        <div class="variant-column"><FormKit v-model="edit.simplified" type="textarea" label="简体候选" outer-class="variant-field" :rows="3" :delay="0" placeholder="选填" /></div>
-                        <div class="variant-column"><FormKit v-model="edit.traditional" type="textarea" label="繁体候选" outer-class="variant-field" :rows="3" :delay="0" placeholder="选填" /></div>
-                    </div>
-                    <p class="variant-help">至少填写一项，每行一个候选；未填写的方向不修改。</p>
-                    <p v-if="previewError" role="alert">{{ previewError }}</p>
-                    <div v-if="variantPreview" class="variant-preview">
-                        <div v-for="row in variantPreview.rows" :key="row.direction">
-                            <span>{{ row.direction==='v2s'?'转简体':'转繁体' }}</span>
-                            <span>{{ row.character }} → {{ row.candidates.join(' / ') }}</span>
-                            <small v-if="row.disabled">将启用</small><small v-else-if="row.reviewRequired">待确认</small>
-                            <small v-if="row.baseSupplement">基础补充</small>
-                        </div>
-                        <small>已有候选保留，新候选追加。</small>
-                    </div>
-                    <FormKit v-if="variantPreview?.confirmationRequired" v-model="edit.confirmed" type="checkbox" label="确认以上映射并启用" />
-                </template>
-                <template v-else>
                     <FormKit v-model="edit.candidates" type="textarea" label="候选字" help="每行一个候选，支持字形或十六进制 Unicode 码。" validation="required" :rows="5" />
                     <div class="edit-preview"><template v-for="(candidate, index) in candidatePreview" :key="index"><span v-if="!candidate.error" class="glyph"><span class="character">{{ candidate.character }}</span><small>{{ unicodeCodes(candidate.character) }}</small></span><span v-else role="alert">{{ candidate.error }}</span></template></div>
-                </template>
+
                 <FormKit v-model="edit.note" type="textarea" label="备注" :maxlength="300" :rows="2" />
                 <FormKit v-if="edit.pending" v-model="edit.confirmed" type="checkbox" label="我已确认这些字形关系及候选顺序" />
             </FormKit>
             <template #footer>
                 <div class="editor-actions">
                     <VButton :disabled="saving" @click="editorVisible = false">取消</VButton>
-                    <VButton type="primary" :loading="saving" :disabled="saving || (variantMode ? previewLoading || !variantPreview || (variantPreview.confirmationRequired && !edit.confirmed) : edit.pending && !edit.confirmed)" @click="submitEditor">{{ edit.pending ? '确认' : '保存' }}</VButton>
+                    <VButton type="primary" :loading="saving" :disabled="saving || (edit.pending && !edit.confirmed)" @click="submitEditor">{{ edit.pending ? '确认' : '保存' }}</VButton>
                 </div>
             </template>
         </VModal>
@@ -340,7 +230,7 @@ async function showSources(row) {
 <style scoped>
 .dictionary-page { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 16px; padding: 16px; container-type: inline-size; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.filters { display: grid; grid-template-columns: minmax(140px, 200px) minmax(140px, 200px) minmax(220px, 1fr) auto; align-items: end; gap: 16px; padding: 8px; }
+.filters { display: grid; grid-template-columns: minmax(140px, 200px) minmax(220px, 1fr) auto; align-items: end; gap: 16px; padding: 8px; }
 .filter-field { display: grid; gap: 12px; min-width: 0; }
 .filter-field > label { font-size: 13px; }
 .filter-field :deep(.char-filter-control) { margin: 0 !important; }
@@ -369,17 +259,6 @@ td small { display: block; font-size: 10px; opacity: .6; }
 .pagination { display: flex; align-items: center; justify-content: end; flex-wrap: wrap; gap: 12px; padding: 16px 8px 0; font-size: 13px; }
 .history { max-height: 60vh; }
 .editor-actions { display: flex; justify-content: end; gap: 8px; }
-.variant-fields { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:16px;padding:0;margin:0; }
-.variant-column { min-width:0; }
-/* FormKit spaces successive fields vertically; each grid column owns its field. */
-.variant-fields :deep(.variant-field) { margin:0 !important;padding:0 !important;border:0 !important;min-width:0; }
-.variant-fields :deep(.formkit-label) { display:block;margin:0 0 8px !important; }
-.variant-fields :deep(.formkit-inner) { margin:0 !important; }
-.variant-fields :deep(textarea) { display:block;box-sizing:border-box;width:100%;min-height:80px;margin:0; }
-.variant-help { font-size:12px;line-height:1.5;opacity:.7;margin:8px 0 16px; }
-.variant-preview { margin:0 0 16px;font-size:13px; }
-.variant-preview > div { display:flex;align-items:baseline;flex-wrap:wrap;gap:8px 16px;padding:8px 0; }
-.variant-preview small { opacity:.7;font-size:12px; }
 .section-nav { padding: 0 4px; }
 .review-note { padding: 12px; margin-bottom: 16px; border: 1px solid #e0bc54; border-radius: 6px; font-size: 13px; }
 .review-note p { margin: 0 0 6px; }

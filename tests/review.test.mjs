@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { GlyphConverter } from '../web/engine.js';
 
 test('default conversion is plain text; review choices are independent occurrences', () => {
-    const converter = new GlyphConverter('v2t', {'发': ['發', '髮'], A: ['B'], B: ['C']});
+    const converter = new GlyphConverter({'发': ['發', '髮'], A: ['B'], B: ['C']});
     assert.equal(converter.convert('发发A'), '發發B');
     const document = converter.review('发发A');
     const [first, second] = document.positions;
@@ -22,7 +22,7 @@ test('default conversion is plain text; review choices are independent occurrenc
 });
 
 test('review preserves exact unknown glyph sequences, line endings and literal markup', () => {
-    const converter = new GlyphConverter('v2t', {'干': ['干', '幹'], '𠀀': ['一', '壹']});
+    const converter = new GlyphConverter({'干': ['干', '幹'], '𠀀': ['一', '壹']});
     const input = '干\r\n𠀀 干\u{E0100} e\u0301 👩‍💻 <script>【原文】</script>';
     const document = converter.review(input);
     assert.equal(document.positions.length, 2);
@@ -32,7 +32,7 @@ test('review preserves exact unknown glyph sequences, line endings and literal m
 });
 
 test('lexicon-resolved positions do not require review; conflicts only expose approved candidates', () => {
-    const converter = new GlyphConverter('v2t', {'干': ['干', '乾', '幹']}, [
+    const converter = new GlyphConverter({'干': ['干', '乾', '幹']}, [
         {phrase: '干燥', choices: [{offset: 0, source: '干', target: '乾'}]},
         {phrase: '干事', choices: [{offset: 0, source: '干', target: '乾'}]},
         {phrase: '干事', choices: [{offset: 0, source: '干', target: '幹'}]},
@@ -48,11 +48,11 @@ test('lexicon-resolved positions do not require review; conflicts only expose ap
 });
 
 test('next pending occurrence skips confirmed choices and wraps once', () => {
-    const document = new GlyphConverter('v2s', {'乾': ['乾', '干']}).review('乾，乾，乾');
+    const document = new GlyphConverter({'乾': ['乾', '干']}).review('乾，乾，乾');
     const [first, second, third] = document.positions;
     document.choose(second, '干');
     assert.equal(document.next(first, 1, true), third);
     assert.equal(document.next(third, 1, true), first);
     assert.equal(document.next(first, -1, true), third);
-    assert.equal(new GlyphConverter('v2s', {}).review('').next(null), null);
+    assert.equal(new GlyphConverter({}).review('').next(null), null);
 });

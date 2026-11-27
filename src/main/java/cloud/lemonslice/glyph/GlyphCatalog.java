@@ -6,30 +6,24 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
-import org.springframework.web.server.ResponseStatusException;
 
 @Component
 public final class GlyphCatalog {
-    public record Review(List<String> candidates, List<String> reasons, List<String> evidence, List<String> links) {}
-    public record Reference(Map<String,Map<String,List<String>>> mappings, Map<String,List<String>> links) {}
-    private final Map<String, Map<String, List<String>>> mappings;
-    private final Map<String, Map<String, Review>> reviews;
-    private volatile Map<String, Object> sources;
+    public record Review(List<String> candidates,List<String> reasons,List<String> evidence,List<String> links) {}
+    public record Reference(Map<String,List<String>> mappings,Map<String,List<String>> links) {}
+    private final Map<String,List<String>> mapping;
+    private final Map<String,Review> reviews;
+    private volatile Map<String,Object> sources;
     private volatile Reference reference;
-
     public GlyphCatalog() {
-        var mapper = new ObjectMapper();
-        this.mappings = Map.of("common", read(mapper, "data/common.json", new TypeReference<>() {}), "v2s", read(mapper, "data/v2s.json", new TypeReference<>() {}),
-            "v2t", read(mapper, "data/v2t.json", new TypeReference<>() {}));
-        this.reviews = read(mapper, "data/reviews.json", new TypeReference<>() {});
+        var mapper=new ObjectMapper();
+        mapping=read(mapper,"data/dictionary.json",new TypeReference<>() {});
+        reviews=read(mapper,"data/reviews.json",new TypeReference<>() {});
     }
-    GlyphCatalog(Map<String, Map<String, List<String>>> mappings, Map<String, Map<String, Review>> reviews) {
-        this(mappings,reviews,new Reference(Map.of(),Map.of()));
-    }
-    GlyphCatalog(Map<String, Map<String, List<String>>> mappings, Map<String, Map<String, Review>> reviews, Reference reference) {
-        this.mappings = mappings; this.reviews = reviews; this.sources = Map.of();this.reference=reference;
+    GlyphCatalog(Map<String,List<String>> mapping,Map<String,Review> reviews) { this(mapping,reviews,new Reference(Map.of(),Map.of())); }
+    GlyphCatalog(Map<String,List<String>> mapping,Map<String,Review> reviews,Reference reference) {
+        this.mapping=mapping;this.reviews=reviews;this.reference=reference;this.sources=Map.of();
     }
     private Reference reference() {
         if(reference==null) synchronized(this) {
@@ -37,30 +31,24 @@ public final class GlyphCatalog {
         }
         return reference;
     }
-    boolean corroborates(String direction,String character,List<String> candidates) {
-        if(candidates==null || candidates.isEmpty()) return false;
-        if(direction.equals("common")) return corroborates("v2s",character,candidates) && corroborates("v2t",character,candidates);
-        return reference().mappings().getOrDefault(direction,Map.of()).getOrDefault(character,List.of()).containsAll(candidates);
+    boolean corroborates(String character,List<String> candidates) {
+        return candidates!=null && !candidates.isEmpty() && reference().mappings().getOrDefault(character,List.of()).containsAll(candidates);
     }
     List<Map<String,String>> referenceRecords(String character) {
-        return reference().links().getOrDefault(character,List.of()).stream().map(url->Map.of(
-            "label","中国台湾地区教育主管部门《異體字字典》：补充参考","url",url)).toList();
+        return reference().links().getOrDefault(character,List.of()).stream().map(url->Map.of("label","中国台湾地区教育主管部门《異體字字典》：补充参考","url",url)).toList();
     }
-    Map<String, List<String>> mapping(String direction) { validate(direction); return mappings.getOrDefault(direction, Map.of()); }
-    Map<String, Review> reviews(String direction) { validate(direction); return reviews.getOrDefault(direction, Map.of()); }
-    Map<String, Object> sources() {
+    Map<String,List<String>> mapping() { return mapping; }
+    Map<String,Review> reviews() { return reviews; }
+    Map<String,Object> sources() {
         if(sources==null) synchronized(this) {
             if(sources==null) sources=read(new ObjectMapper(),"data/sources.json",new TypeReference<>() {});
         }
         return sources;
     }
-    static void validate(String direction) {
-        if (!List.of("common", "v2s", "v2t").contains(direction)) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "字库不存在");
-    }
-    private static <T> T read(ObjectMapper mapper, String file, TypeReference<T> type) {
-        try (var stream = GlyphCatalog.class.getClassLoader().getResourceAsStream(file)) {
-            if (stream == null) throw new IllegalStateException("字形资料缺失：" + file);
-            return mapper.readValue(stream, type);
-        } catch (IOException failure) { throw new IllegalStateException("无法读取字形资料：" + file, failure); }
+    private static <T> T read(ObjectMapper mapper,String file,TypeReference<T> type) {
+        try(var stream=GlyphCatalog.class.getClassLoader().getResourceAsStream(file)) {
+            if(stream==null) throw new IllegalStateException("字形资料缺失："+file);
+            return mapper.readValue(stream,type);
+        } catch(IOException failure) { throw new IllegalStateException("无法读取字形资料："+file,failure); }
     }
 }

@@ -17,9 +17,9 @@ async function fixture(t, options = {}) {
         path = String(path);
         if (path === 'access') return {ok: true, json: async () => ({canManage: false})};
         if (path.startsWith('lexicon.json')) return {ok: true, json: async () => []};
-        if (path.startsWith('dictionaries/')) {
+        if (path === 'dictionary.json') {
             if (options.dictionary) return options.dictionary(path);
-            const value = path.includes('v2s') ? {'乾': ['乾', '干'], '發': ['发']} : {'乾': ['乾'], '干': ['干', '乾', '幹'], '发': ['發', '髮']};
+            const value = {'乾': ['乾', '干'], '發': ['发']};
             return {ok: true, json: async () => value};
         }
         throw new Error('Unexpected request: ' + path);
@@ -65,7 +65,7 @@ test('default mode uses native capsule radio groups and exports plain converted 
     const {document, get, convert, copied} = await fixture(t);
     assert.equal(document.querySelector('input[name="mode"]:checked').value, 'one2one');
     assert.equal(document.querySelectorAll('.controls select').length, 0);
-    assert.equal(document.querySelectorAll('.controls fieldset').length, 2);
+    assert.equal(document.querySelectorAll('.controls fieldset').length, 1);
     await convert('乾乾');
     assert.equal(get('outputText').value, '乾乾');
     assert.equal(get('outputText').hidden, false);
@@ -99,18 +99,15 @@ test('per-occurrence choices auto-advance, support keyboard, and survive view ch
     assert.deepEqual(copied, ['乾干']);
 });
 
-test('changing the original or target invalidates choices and cannot export stale results', async t => {
+test('changing the original invalidates choices and the removed direction controls never return', async t => {
     const {get, radio, convert, input, idle} = await fixture(t);
     radio('modeCandidates');
     await convert('乾');
     get('candidateChoices').querySelector('[data-candidate="干"]').click();
     assert.equal(get('outputText').value, '干');
-    radio('targetTraditional');
-    await idle();
-    assert.equal(get('outputText').value, '乾');
-    assert.equal(get('reviewStatus').textContent, '没有多候选字');
+    assert.equal(get('targetTraditional'), null);
+    assert.equal(get('feedbackDirection'), null);
     get('openFeedback').click();
-    assert.equal(get('feedbackDirection').value, 'v2t');
     input('新文本');
     assert.equal(get('outputText').value, '');
     assert.equal(get('copyOutput').disabled, true);

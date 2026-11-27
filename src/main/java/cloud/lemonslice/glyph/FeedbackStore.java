@@ -16,8 +16,8 @@ import reactor.util.retry.Retry;
 
 @Service
 public final class FeedbackStore {
-    public record Request(String character, String candidate, String direction, String note) {}
-    public record Ticket(String id, String character, String candidate, String direction, String note, String status, String createdAt, String reply, String updatedBy) {}
+    public record Request(String character, String candidate, String note) {}
+    public record Ticket(String id, String character, String candidate, String note, String status, String createdAt, String reply, String updatedBy) {}
     public record State(Map<String,Ticket> tickets) { static State initial() { return new State(Map.of()); } }
     public record Update(String status, String reply, Long version) {}
     public record Page(Long version,List<Ticket> items) {}
@@ -27,7 +27,6 @@ public final class FeedbackStore {
     private static final String NAME="lemonslice-glyphlens-feedback";
     public FeedbackStore(VersionedDocuments documents) { this.documents=documents; }
     public Mono<Receipt> submit(Request request, String visitor) {
-        GlyphCatalog.validate(request.direction());
         String source=UnicodeInput.character(request.character());
         String candidate=request.candidate()==null || request.candidate().isBlank() ? "" : UnicodeInput.character(request.candidate());
         String note=GlyphStore.note(request.note());
@@ -45,7 +44,7 @@ public final class FeedbackStore {
         return Mono.defer(() -> documents.read(NAME,State.class,State::initial).flatMap(snapshot -> {
             var tickets=new LinkedHashMap<>(snapshot.value().tickets());
             if(tickets.size()>=2000) return Mono.error(new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"反馈暂满，请稍后提交"));
-            tickets.put(id,new Ticket(id,source,candidate,request.direction(),note,"pending",Instant.now().toString(),"",""));
+            tickets.put(id,new Ticket(id,source,candidate,note,"pending",Instant.now().toString(),"",""));
             return documents.write(snapshot,snapshot.version(),new State(tickets)).map(version -> new Receipt(id));
         })).retryWhen(Retry.max(2).filter(failure -> failure instanceof ResponseStatusException status && status.getStatusCode().value()==409));
     }
@@ -57,7 +56,7 @@ public final class FeedbackStore {
             Ticket previous=snapshot.value().tickets().get(id);
             if(previous==null) return Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND,"反馈不存在"));
             var tickets=new LinkedHashMap<>(snapshot.value().tickets());
-            tickets.put(id,new Ticket(id,previous.character(),previous.candidate(),previous.direction(),previous.note(),update.status(),previous.createdAt(),reply,actor));
+            tickets.put(id,new Ticket(id,previous.character(),previous.candidate(),previous.note(),update.status(),previous.createdAt(),reply,actor));
             return documents.write(snapshot,update.version(),new State(tickets)).map(GlyphStore.Saved::new);
         });
     }

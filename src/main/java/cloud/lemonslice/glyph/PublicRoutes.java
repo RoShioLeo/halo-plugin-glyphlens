@@ -33,23 +33,17 @@ public final class PublicRoutes {
             .GET("/tools/glyphlens",request -> file("index.html"))
             .GET("/tools/glyphlens/",request -> file("index.html"))
             .GET("/tools/glyphlens/access",request -> administrator.allowed().flatMap(allowed -> json(Map.of("canManage",allowed))))
-            .GET("/tools/glyphlens/dictionaries/{file}",this::dictionary)
-            .GET("/tools/glyphlens/lexicon.json",request -> lexicon.publicRules(request.queryParam("direction").orElse("v2s")).flatMap(PublicRoutes::json))
+            .GET("/tools/glyphlens/dictionary.json",request -> glyphs.effective().flatMap(PublicRoutes::json))
+            .GET("/tools/glyphlens/lexicon.json",request -> lexicon.publicRules().flatMap(PublicRoutes::json))
             .GET("/tools/glyphlens/feedback-token",this::csrf)
             .POST("/tools/glyphlens/feedback",request -> request.bodyToMono(FeedbackStore.Request.class).flatMap(body -> request.exchange().getSession().flatMap(session -> {
                 session.getAttributes().put("glyphlens-feedback",true);
                 return feedback.submit(body,session.getId()).flatMap(receipt -> ServerResponse.accepted().contentType(MediaType.APPLICATION_JSON).bodyValue(receipt));
             })))
             .GET("/tools/glyphlens/{*path}",request -> file(request.pathVariable("path").replaceFirst("^/","")))
-            .GET("/tools/char/char_converter/data/{file}",this::dictionary)
             .GET("/tools/char",request -> ServerResponse.temporaryRedirect(URI.create("/tools/glyphlens/")).build())
             .GET("/tools/char/",request -> ServerResponse.temporaryRedirect(URI.create("/tools/glyphlens/")).build())
             .build();
-    }
-    private Mono<ServerResponse> dictionary(ServerRequest request) {
-        String filename=request.pathVariable("file");
-        if(!Set.of("v2s.json","v2t.json").contains(filename)) return ServerResponse.notFound().build();
-        return glyphs.effective(filename.substring(0,3)).flatMap(PublicRoutes::json);
     }
     private Mono<ServerResponse> csrf(ServerRequest request) {
         Mono<CsrfToken> token=request.exchange().getAttribute(CsrfToken.class.getName());

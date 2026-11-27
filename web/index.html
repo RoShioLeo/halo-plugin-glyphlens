@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
     <meta name="theme-color" content="#ffffff">
-    <meta name="description" content="字形转换，支持异体字转简体、繁体及文本文件转换。">
+    <meta name="description" content="将繁体、异体字转换为常用简体，支持多字候选校对及文本文件转换。">
     <title>字镜 GlyphLens · 柠檬汽水池</title>
     <link rel="icon" href="img/glyphlens.svg" type="image/svg+xml">
     <script src="appearance.js"></script>
@@ -44,16 +44,6 @@
                 </div>
             </div>
             <div class="controls">
-                <fieldset class="field">
-                    <legend>转换目标</legend>
-                    <div class="segmented">
-                        <input type="radio" name="direction" id="targetSimplified" value="v2s" checked>
-                        <label for="targetSimplified">简体字</label>
-                        <input type="radio" name="direction" id="targetTraditional" value="v2t">
-                        <label for="targetTraditional">繁体字</label>
-                        <span class="segmented-thumb" aria-hidden="true"></span>
-                    </div>
-                </fieldset>
                 <fieldset class="field">
                     <legend>转换方式</legend>
                     <div class="segmented">
@@ -123,8 +113,6 @@
     <dialog id="feedbackDialog" aria-labelledby="feedbackTitle">
         <form id="feedbackForm">
             <h2 id="feedbackTitle">字形反馈</h2>
-            <label for="feedbackDirection">字库</label>
-            <select id="feedbackDirection"><option value="common">通用字形</option><option value="v2s">简体字</option><option value="v2t">繁体字</option></select>
             <label for="feedbackCharacter">原字</label>
             <input id="feedbackCharacter" type="text" maxlength="10" required placeholder="请输入原字" autocomplete="off" aria-describedby="feedbackCharacterHelp feedbackCode">
             <small id="feedbackCharacterHelp">支持直接输入字形或 Unicode 码，例如：一、U+4E00、4E00。</small>

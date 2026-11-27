@@ -45,7 +45,6 @@ public final class VersionedDocuments {
                 !Objects.equals(current.getMetadata().getVersion(), expected) ? Mono.<Long>error(conflict()) : Mono.<Long>error(failure))
                 .switchIfEmpty(Mono.error(failure)));
     }
-    Mono<ConfigMap> legacy(String direction) { return client.fetch(ConfigMap.class, "lemonslice-char-" + direction); }
     private static ConfigMap empty(String name) {
         var resource = new ConfigMap();var metadata = new Metadata();metadata.setName(name);resource.setMetadata(metadata);return resource;
     }

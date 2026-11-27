@@ -4,10 +4,10 @@ import { onMounted,reactive,ref } from 'vue';
 import { VCard,VButton,VModal,VEmpty,Toast } from '@halo-dev/components';
 import { request } from './api';
 const data=ref({items:[],version:null}),visible=ref(false),saving=ref(false),loading=ref(false);
-const edit=reactive({id:null,phrase:'',result:'',direction:'v2s',sense:'',enabled:true,version:null});
+const edit=reactive({id:null,phrase:'',result:'',sense:'',enabled:true,version:null});
 function resultOf(rule){const chars=[...rule.phrase];for(const choice of rule.choices)chars[choice.offset]=choice.target;return chars.join('');}
 async function load(){loading.value=true;try{data.value=await request('/lexicon');}catch(error){Toast.error(error.message);}finally{loading.value=false;}}
-function open(rule){Object.assign(edit,{id:rule?.id||null,phrase:rule?.phrase||'',result:rule?resultOf(rule):'',direction:rule?.direction||'v2s',sense:rule?.sense||'',enabled:rule?.enabled??true,version:data.value.version});visible.value=true;}
+function open(rule){Object.assign(edit,{id:rule?.id||null,phrase:rule?.phrase||'',result:rule?resultOf(rule):'',sense:rule?.sense||'',enabled:rule?.enabled??true,version:data.value.version});visible.value=true;}
 async function save(){saving.value=true;try{await request('/lexicon',{method:'PUT',body:JSON.stringify(edit)});visible.value=false;Toast.success('已保存');await load();}catch(error){Toast.error(error.message);}finally{saving.value=false;}}
 function submit(){document.getElementById('glyphlens-lexicon-form')?.requestSubmit();}
 onMounted(load);
@@ -16,13 +16,12 @@ onMounted(load);
     <VCard>
         <div class="toolbar"><p>词典仅从已确认字形候选中消歧，不替换词汇。</p><div><VButton :loading="loading" @click="load">刷新</VButton><VButton type="primary" :disabled="loading" @click="open()">新增词条</VButton></div></div>
         <VEmpty v-if="!data.items.length" title="还没有消歧词条" />
-        <div v-else class="table-wrap"><table><thead><tr><th>词条</th><th>消歧结果</th><th>方向</th><th>含义</th><th>状态</th><th>操作</th></tr></thead><tbody>
-            <tr v-for="rule in data.items" :key="rule.id"><td>{{rule.phrase}}</td><td>{{resultOf(rule)}}</td><td>{{rule.direction==='v2s'?'简体':'繁体'}}</td><td>{{rule.sense}}</td><td>{{rule.enabled?'已启用':'已停用'}}</td><td><VButton size="xs" @click="open(rule)">编辑</VButton></td></tr>
+        <div v-else class="table-wrap"><table><thead><tr><th>词条</th><th>消歧结果</th><th>含义</th><th>状态</th><th>操作</th></tr></thead><tbody>
+            <tr v-for="rule in data.items" :key="rule.id"><td>{{rule.phrase}}</td><td>{{resultOf(rule)}}</td><td>{{rule.sense}}</td><td>{{rule.enabled?'已启用':'已停用'}}</td><td><VButton size="xs" @click="open(rule)">编辑</VButton></td></tr>
         </tbody></table></div>
     </VCard>
     <VModal :visible="visible" title="消歧词条" :width="580" @close="visible=false">
         <FormKit id="glyphlens-lexicon-form" type="form" :actions="false" :disabled="saving" @submit="save">
-            <FormKit v-model="edit.direction" type="select" label="转换方向" :options="[{label:'简体字',value:'v2s'},{label:'繁体字',value:'v2t'}]" />
             <FormKit v-model="edit.phrase" type="text" label="原词条" validation="required" :maxlength="128" />
             <FormKit v-model="edit.result" type="text" label="消歧结果" validation="required" help="字数须相同；每个字只能使用已有候选。" :maxlength="128" />
             <FormKit v-model="edit.sense" type="textarea" label="含义" :maxlength="500" :rows="2" />

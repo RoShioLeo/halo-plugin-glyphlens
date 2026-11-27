@@ -12,10 +12,10 @@ onMounted(load);
 <template><VCard>
     <div class="toolbar"><FormKit v-model="status" type="select" :options="[{label:'待核查',value:'pending'},{label:'已处理',value:'resolved'},{label:'不采纳',value:'rejected'}]" /><VButton :loading="loading" @click="load">刷新</VButton></div>
     <VEmpty v-if="!data.items.some(item=>item.status===status)" title="没有对应反馈" />
-    <div v-else class="table-wrap"><table><thead><tr><th>原字</th><th>建议字形</th><th>字库</th><th>说明</th><th>时间</th><th>操作</th></tr></thead><tbody>
+    <div v-else class="table-wrap"><table><thead><tr><th>原字</th><th>建议字形</th><th>说明</th><th>时间</th><th>操作</th></tr></thead><tbody>
         <tr v-for="ticket in data.items.filter(item=>item.status===status)" :key="ticket.id">
             <td><span class="glyph">{{ticket.character}}</span><small>{{unicodeCodes(ticket.character)}}</small></td><td><span class="glyph">{{ticket.candidate||'—'}}</span><small>{{ticket.candidate?unicodeCodes(ticket.candidate):''}}</small></td>
-            <td>{{ticket.direction==='common'?'通用':ticket.direction==='v2s'?'简体':'繁体'}}</td><td>{{ticket.note}}</td><td>{{new Date(ticket.createdAt).toLocaleString('zh-CN')}}</td>
+            <td>{{ticket.note}}</td><td>{{new Date(ticket.createdAt).toLocaleString('zh-CN')}}</td>
             <td><div class="buttons"><VButton size="xs" v-if="status==='pending'" @click="process(ticket,'resolved')">已处理</VButton><VButton size="xs" v-if="status==='pending'" @click="process(ticket,'rejected')">不采纳</VButton></div></td>
         </tr>
     </tbody></table></div>

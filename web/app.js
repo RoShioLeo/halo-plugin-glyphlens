@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 import { GlyphConverter } from './engine.js';
 import { ReviewView } from './review-view.js';
-const converters = new Map();
+let converterCache = null;
 const element = id => document.getElementById(id);
 const selected = name => [...document.getElementsByName(name)].find(input => input.checked).value;
 const isReviewMode = () => selected('mode') === 'one2many';
@@ -15,7 +15,7 @@ fetch('access', {credentials: 'same-origin', cache: 'no-store'})
     .then(response => response.ok ? response.json() : {canManage: false})
     .then(access => { element('dictionaryAdmin').hidden = access.canManage !== true; })
     .catch(() => { element('dictionaryAdmin').hidden = true; });
-window.addEventListener('focus', () => converters.clear());
+window.addEventListener('focus', () => { converterCache = null; });
 
 const review = new ReviewView({
     panel: element('reviewPanel'), text: element('reviewText'), status: element('reviewStatus'),
@@ -47,16 +47,13 @@ function updateFileControls() {
     element('convertFile').textContent = isReviewMode() ? '转换文件' : '转换并下载';
 }
 
-async function currentConverter(option) {
-    if (!converters.has(option)) {
-        const converter = new GlyphConverter(option);
-        converters.set(option, converter);
-    }
-    const converter = converters.get(option);
+async function currentConverter() {
+    if (!converterCache) converterCache = new GlyphConverter();
+    const converter = converterCache;
     try {
         await converter.loaded;
     } catch (error) {
-        converters.delete(option);
+        if (converterCache === converter) converterCache = null;
         throw error;
     }
     return converter;
@@ -73,9 +70,9 @@ async function runConversion(action) {
 }
 
 async function convertInput(token) {
-    const input = element('inputText').value, direction = selected('direction');
-    const converter = await currentConverter(direction);
-    if (token !== revision || input !== element('inputText').value || direction !== selected('direction')) return;
+    const input = element('inputText').value;
+    const converter = await currentConverter();
+    if (token !== revision || input !== element('inputText').value) return;
     result = converter.review(input);
     outputFilename = '字镜-转换结果.txt';
     renderOutput();
@@ -83,11 +80,6 @@ async function convertInput(token) {
 
 element('convertText').addEventListener('click', () => runConversion(convertInput));
 element('inputText').addEventListener('input', invalidate);
-document.querySelectorAll('input[name="direction"]').forEach(input => input.addEventListener('change', () => {
-    const hadResult = !!result;
-    invalidate();
-    if (hadResult) runConversion(convertInput);
-}));
 document.querySelectorAll('input[name="mode"]').forEach(input => input.addEventListener('change', () => {
     revision++;
     renderOutput();
@@ -151,9 +143,8 @@ element('fileInput').addEventListener('change', () => {
 element('convertFile').addEventListener('click', () => runConversion(async token => {
     const file = element('fileInput').files[0];
     if (!file) return;
-    const direction = selected('direction');
-    const [converter, bytes] = await Promise.all([currentConverter(direction), file.arrayBuffer()]);
-    if (token !== revision || direction !== selected('direction') || file !== element('fileInput').files[0]) return;
+    const [converter, bytes] = await Promise.all([currentConverter(), file.arrayBuffer()]);
+    if (token !== revision || file !== element('fileInput').files[0]) return;
     const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     element('inputText').value = text;
     result = converter.review(text);
@@ -181,7 +172,6 @@ element('openFeedback').addEventListener('click', () => {
     element('feedbackForm').reset();element('feedbackStatus').textContent = '';element('feedbackCode').textContent = '';
     const input = element('inputText'), selectedText = input.value.slice(input.selectionStart, input.selectionEnd);
     if ([...selectedText].length === 1) element('feedbackCharacter').value = selectedText;
-    element('feedbackDirection').value = selected('direction');
     element('feedbackDialog').showModal();element('feedbackCharacter').focus();
 });
 element('cancelFeedback').addEventListener('click', () => element('feedbackDialog').close());
@@ -192,7 +182,7 @@ element('feedbackCharacter').addEventListener('input', () => {
 element('feedbackForm').addEventListener('submit', async event => {
     event.preventDefault();const button = element('submitFeedback');button.disabled = true;
     try {
-        const body = {character: feedbackCharacter(element('feedbackCharacter').value), candidate: feedbackCharacter(element('feedbackCandidate').value, true), direction: element('feedbackDirection').value, note: element('feedbackNote').value.trim()};
+        const body = {character: feedbackCharacter(element('feedbackCharacter').value), candidate: feedbackCharacter(element('feedbackCandidate').value, true), note: element('feedbackNote').value.trim()};
         if (!body.candidate && !body.note) throw new Error('请填写建议字形或说明');
         const tokenResponse = await fetch('feedback-token', {credentials: 'same-origin', cache: 'no-store'});
         if (!tokenResponse.ok) throw new Error('暂时无法提交，请稍后重试');

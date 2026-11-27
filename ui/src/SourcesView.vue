@@ -14,8 +14,8 @@ onMounted(load);
     <p v-for="(url,key) in data.links" :key="key"><a :href="url" target="_blank" rel="noopener noreferrer">{{labels[key]||key}}</a></p>
     <section v-if="data.summary.counts" class="counts">
         <h3>当前基础字库</h3>
-        <p>转简体 {{formatCount(data.summary.counts.v2s?.effective_records)}} 条 · 转繁体 {{formatCount(data.summary.counts.v2t?.effective_records)}} 条</p>
-        <p class="muted">已包含通用表和参考资料补充，不含本站人工添加的映射。</p>
+        <p>有效映射 {{formatCount(data.summary.counts.records)}} 条 · 待确认 {{formatCount(data.summary.counts.pending)}} 项</p>
+        <p class="muted">单一字库，已包含发布前确认的修正和参考资料补充。</p>
     </section>
     <section class="counts">
         <h3>《通用规范汉字表》原始资料</h3>

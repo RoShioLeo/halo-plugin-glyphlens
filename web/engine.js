@@ -2,7 +2,6 @@
 import { DisambiguationIndex } from './lexicon.js';
 import { ReviewDocument } from './review-document.js';
 
-const directions = new Set(['v2s', 'v2t']);
 const modes = new Set(['one2many', 'one2one']);
 const graphemes = new Intl.Segmenter('und', {granularity: 'grapheme'});
 const scalar = value => typeof value === 'string' && [...value].length === 1 &&
@@ -13,9 +12,7 @@ const json = url => fetch(url, {cache: 'no-store'}).then(response => {
 
 /** Exactly one lookup per source character. Replacements never re-enter the input. */
 export class GlyphConverter {
-    constructor(direction = 'v2s', dictionary, lexicon = []) {
-        if (!directions.has(direction)) throw new TypeError('未知转换方向');
-        this.direction = direction;
+    constructor(dictionary, lexicon = []) {
         this.mode = 'one2one';
         this.main = new Uint32Array(0xA000 - 0x3400);
         this.extension = new Uint32Array(0x33480 - 0x20000);
@@ -23,7 +20,7 @@ export class GlyphConverter {
         this.pool = [null];
         this.lexicon = new DisambiguationIndex();
         this.loaded = dictionary ? Promise.resolve(this.install(dictionary, lexicon)) :
-            Promise.all([json(`dictionaries/${direction}.json`), json(`lexicon.json?direction=${direction}`)])
+            Promise.all([json('dictionary.json'), json('lexicon.json')])
                 .then(([entries, rules]) => this.install(entries, rules));
     }
     install(dictionary, rules = []) {

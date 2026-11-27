@@ -13,7 +13,7 @@ spec:
   repo: https://github.com/RoShioLeo/halo-plugin-glyphlens
   issues: https://github.com/RoShioLeo/halo-plugin-glyphlens/issues
   displayName: 字镜 · GlyphLens
-  description: 面向 Halo 的字形转换工具，让非常用异体字回归常用写法，支持繁简转换、候选对照与字库维护。
+  description: 面向 Halo 的字形转换工具，将繁体、异体字转换为常用简体，支持点选校对与统一字库维护。
   license:
     - name: MIT (original code)
       url: https://opensource.org/license/mit

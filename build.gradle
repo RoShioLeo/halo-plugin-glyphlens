@@ -17,12 +17,22 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8'; options.release = 21 }
 test { useJUnitPlatform() }
 tasks.named('processResources') {
+    inputs.property('glyphlensVersion', project.version.toString())
+    inputs.file('dictionary/VERSION')
     from('web') {
         into 'web'
         filteringCharset = 'UTF-8'
-        filesMatching('index.html') { filter { line -> line == '<head>' ? line + '\n    <base href="/tools/glyphlens/">' : line } }
+        filesMatching('index.html') {
+            filter { line ->
+                def rendered = line == '<head>' ? line + '\n    <base href="/tools/glyphlens/">' : line
+                rendered = rendered.replaceAll(/(<span id="appVersion">)[^<]*(<\/span>)/, '$1v' + project.version + '$2')
+                rendered.replaceAll(/(<span id="dictionaryVersion">)[^<]*(<\/span>)/, '$1v' + file('dictionary/VERSION').getText('UTF-8').trim() + '$2')
+            }
+        }
     }
-    from('data') { include '*.json'; into 'data' }
+    from('dictionary/data') { include '*.json'; into 'data' }
+    from('dictionary') { include 'README.md', 'NOTICE.md', 'LICENSE', 'licenses/**'; into 'dictionary' }
+    from('docs/DICTIONARY-IMPORT.md') { rename { 'FORMAT.md' }; into 'dictionary' }
 }
 tasks.register('processUiResources', Sync) {
     from project(':ui').layout.buildDirectory.dir('dist')

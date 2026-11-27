@@ -8,11 +8,20 @@ import { request } from './api';
 import LexiconView from './LexiconView.vue';
 import FeedbackView from './FeedbackView.vue';
 import SourcesView from './SourcesView.vue';
+import DictionaryImport from './DictionaryImport.vue';
 
 const section=ref('glyphs'),query=ref(''),source=ref('all'),page=ref(1);
 const result=ref({items:[],total:0,version:null,effectiveCount:0,changedCount:0});
 const loading=ref(false),saving=ref(false),selected=ref([]),error=ref('');
 const editorVisible=ref(false),historyVisible=ref(false),history=ref([]),sourceVisible=ref(false),sourceRecords=ref([]);
+const sourceCharacter=ref(''),sourceConfirmation=ref({});
+const importVisible=ref(false),dictionaryRevision=ref(0);
+function imported(){dictionaryRevision.value++;load();}
+const sourceGroups=computed(()=>{
+    const groups=new Map();
+    for(const record of sourceRecords.value){const key=record.candidate||'';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(record);}
+    return [...groups].map(([candidate,records])=>({candidate,records}));
+});
 const selectable=computed(()=>result.value.items);
 const selectedAction=computed(()=>batchAction(result.value.items,selected.value));
 const actionLabels={disable:'停用',enable:'启用',approve:'审核'};
@@ -99,7 +108,7 @@ const formatTime=value=>value?new Date(value).toLocaleString('zh-CN'):'初始修
 function openPublic(){window.open('/tools/glyphlens/','_blank','noopener,noreferrer');}
 function submitEditor(){document.getElementById('char-edit-form')?.requestSubmit();}
 async function showSources(row) {
-    try{const data=await request('/sources?'+new URLSearchParams({character:row.character}));sourceRecords.value=data.records;sourceVisible.value=true;}
+    try{const data=await request('/sources?'+new URLSearchParams({character:row.character}));sourceCharacter.value=data.character;sourceRecords.value=data.records;sourceConfirmation.value=data.confirmation||{};sourceVisible.value=true;}
     catch(failure){Toast.error(failure.message);}
 }
 </script>
@@ -111,6 +120,7 @@ async function showSources(row) {
                 <VButton :disabled="loading || !!error" @click="showHistory">修改记录</VButton>
                 <VButton :disabled="loading || !!error" @click="download('overrides')">导出修正</VButton>
                 <VButton :disabled="loading || !!error" @click="download('table')">导出字库</VButton>
+                <VButton :disabled="loading || saving" @click="importVisible=true">导入字库</VButton>
                 <VButton :disabled="loading || !!error" @click="download('reviews')">导出待确认</VButton>
                 <VButton @click="openPublic">查看前台</VButton>
             </div>
@@ -121,7 +131,7 @@ async function showSources(row) {
             <VButton :type="section==='glyphs'?'secondary':undefined" @click="section='glyphs'">字库</VButton>
             <VButton :type="section==='lexicon'?'secondary':undefined" @click="section='lexicon'">词典消歧</VButton>
             <VButton :type="section==='feedback'?'secondary':undefined" @click="section='feedback'">字形反馈</VButton>
-            <VButton :type="section==='sources'?'secondary':undefined" @click="section='sources'">资料来源</VButton>
+            <VButton :type="section==='sources'?'secondary':undefined" @click="section='sources'">字库版本</VButton>
         </div>
         <template v-if="section === 'glyphs'">
         <VCard>
@@ -204,13 +214,39 @@ async function showSources(row) {
             </template>
         </VModal>
         <VModal :visible="sourceVisible" title="字形来源" :width="640" @close="sourceVisible=false">
-            <p v-if="!sourceRecords.length">该条目来自人工修正或待核查的补充资料。</p>
-            <p v-for="(record,index) in sourceRecords" :key="index"><a :href="record.url" target="_blank" rel="noopener noreferrer">{{ record.label }}</a></p>
+            <div class="source-details">
+                <h3>原始资料</h3>
+                <p v-if="!sourceRecords.length">暂未关联原始出处。后台修正可在“修改记录”中查看。</p>
+                <section v-for="group in sourceGroups" :key="group.candidate" class="source-group">
+                    <h4 v-if="group.candidate">{{sourceCharacter}} → {{group.candidate}}</h4>
+                    <div v-for="(record,index) in group.records" :key="index" class="source-path">
+                        <p v-if="record.kind==='retained'" class="source-note">保留原字选项，属于转换策略，不作外部映射来源。</p>
+                        <p v-else-if="record.kind==='manual'" class="source-note">{{record.label}}：{{record.note}}</p>
+                        <p v-else-if="record.kind==='unresolved'" class="source-note">原始出处待补；已有确认记录仍保留。</p>
+                        <template v-else-if="record.steps?.length">
+                            <p v-if="record.steps.length>1" class="source-note">经中间字归并：{{record.path.join(' → ')}}</p>
+                            <p v-for="(step,stepIndex) in record.steps" :key="stepIndex">
+                                <a :href="step.url" target="_blank" rel="noopener noreferrer">{{step.label}}</a>
+                                <span> · {{step.from}} → {{step.to}}</span>
+                                <small>{{step.locator}}<template v-if="step.reversed"> · 反向对照，原记录 {{step.raw}}</template></small>
+                                <small v-if="step.note">{{step.note}}</small>
+                            </p>
+                        </template>
+                        <p v-else><a :href="record.url" target="_blank" rel="noopener noreferrer">{{record.label}}</a></p>
+                    </div>
+                </section>
+                <section v-if="sourceConfirmation.status" class="source-confirmation">
+                    <h3>审核记录</h3>
+                    <p><a :href="sourceConfirmation.url" target="_blank" rel="noopener noreferrer">{{sourceConfirmation.label}}</a> · {{sourceConfirmation.date}}</p>
+                    <p>采用候选：{{sourceConfirmation.candidates.join(' / ')}}</p>
+                </section>
+            </div>
         </VModal>
         </template>
         <LexiconView v-else-if="section === 'lexicon'" />
         <FeedbackView v-else-if="section === 'feedback'" />
-        <SourcesView v-else />
+        <SourcesView v-else :key="dictionaryRevision" @import="importVisible=true" />
+        <DictionaryImport v-if="importVisible" :visible="importVisible" @close="importVisible=false" @saved="imported" />
         <VModal :visible="historyVisible" title="修改记录" :width="900" @close="historyVisible = false">
             <VEmpty v-if="!history.length" title="还没有后台修改记录" />
             <div v-else class="table-wrap history">
@@ -258,6 +294,7 @@ td small { display: block; font-size: 10px; opacity: .6; }
 .note { min-width: 120px; max-width: 240px; overflow-wrap: anywhere; }
 .pagination { display: flex; align-items: center; justify-content: end; flex-wrap: wrap; gap: 12px; padding: 16px 8px 0; font-size: 13px; }
 .history { max-height: 60vh; }
+.source-details{max-height:65vh;overflow:auto;font-size:13px;line-height:1.7}.source-details h3{margin:0 0 12px;font-size:14px;font-weight:600}.source-details h4{margin:0 0 8px;font-size:16px;font-weight:500}.source-group+.source-group,.source-confirmation{margin-top:20px;padding-top:16px;border-top:1px solid #94a3b830}.source-path+.source-path{margin-top:12px}.source-path p{margin:4px 0}.source-path small{display:block;opacity:.65;font-size:11px}.source-details a{text-decoration:underline}.source-note{opacity:.7}
 .editor-actions { display: flex; justify-content: end; gap: 8px; }
 .section-nav { padding: 0 4px; }
 .review-note { padding: 12px; margin-bottom: 16px; border: 1px solid #e0bc54; border-radius: 6px; font-size: 13px; }

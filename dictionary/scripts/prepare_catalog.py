@@ -4,6 +4,7 @@ from pathlib import Path
 from collections import defaultdict,Counter
 import argparse,json,re,unicodedata
 from reference_policy import select_reference
+from source_provenance import compile_provenance
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -106,39 +107,46 @@ def compile_catalog(cache,output):
     for c,values in decisions['accepted'].items():
         assert len(c)==1 and values and len(set(values))==len(values) and all(len(t)==1 for t in values)
         mapping[c]=values;reviews.pop(c,None)
-        references[c].append({'label':'维护者确认的默认关系（2026-11-27）','url':'https://github.com/RoShioLeo/halo-plugin-glyphlens/blob/main/research/maintainer-decisions.json'})
     for c in decisions['rejected']:
         mapping.pop(c,None);reviews.pop(c,None)
     counts={'records':len(mapping),'relations':sum(map(len,mapping.values())),'pending':len(reviews),'multi':sum(len(v)>1 for v in mapping.values())}
+    provenance,confirmations=compile_provenance(cache,mapping,decisions)
     # Attribute each candidate relation once. A multi-candidate source may have
     # targets from different sources, so per-source character counts can overlap.
     def origin(c,target):
+        records=[item for item in provenance[c] if item['candidate']==target]
+        if target==c:return 'retained'
+        if all(item['kind']=='manual' for item in records):return 'manual'
+        if all(item['kind']=='unresolved' for item in records):return 'unresolved'
+        documented={item['source'] for item in records if item['kind']=='documented'}
         if c in aliases or c in punctuation:return 'unicode'
-        if target in formal_edges.get(c,set()):return 'mainland'
-        if target in supplements.get(c,[]):return 'variants'
-        if target in opencc_targets.get(c,set()):return 'opencc'
-        if target in unicode_targets.get(c,set()):return 'unicode'
-        if target in reference['mappings'].get(c,[]):return 'variants'
-        return 'curated'
+        if target in formal_edges.get(c,set()) and 'mainland' in documented:return 'mainland'
+        if target in supplements.get(c,[]) and 'variants' in documented:return 'variants'
+        if target in opencc_targets.get(c,set()) and 'opencc' in documented:return 'opencc'
+        if target in unicode_targets.get(c,set()) and 'unicode' in documented:return 'unicode'
+        if target in reference['mappings'].get(c,[]) and 'variants' in documented:return 'variants'
+        return next(key for key in ['mainland','unicode','opencc','variants'] if key in documented)
     source_characters=defaultdict(set);source_relations=Counter()
     for c,values in mapping.items():
         for target in values:
             key=origin(c,target);source_characters[key].add(c);source_relations[key]+=1
-    source_counts={key:{'characters':len(source_characters[key]),'relations':source_relations[key]} for key in ['mainland','unicode','opencc','variants','curated']}
+    source_counts={key:{'characters':len(source_characters[key]),'relations':source_relations[key]} for key in ['mainland','unicode','opencc','variants','manual','retained','unresolved']}
     assert sum(item['relations'] for item in source_counts.values())==counts['relations']
     lexicon=json.loads((ROOT/'data/lexicon.json').read_text(encoding='utf-8'))
     summary={'scope':'繁体、异体字到常用简体；单一字库；维护者确认优先','mainland_standard':8105,'formal_traditional':2574,'formal_variants':1023,
-             'version':next(line.split('=',1)[1] for line in (ROOT/'gradle.properties').read_text(encoding='utf-8').splitlines() if line.startswith('version=')),
+             'version':(ROOT/'VERSION').read_text(encoding='utf-8').strip(),
              'source_counts':source_counts,
              'lexicon':{'rules':len(lexicon),'contexts':sum(len(rule['contexts']) for rule in lexicon),'characters':len({rule['character'] for rule in lexicon})},
              'reference_policy':{'simple_max_level':2,'automatic':len(supplements),'excluded':reference_stats},
              'maintainer_decisions':{'accepted':len(decisions['accepted']),'rejected':len(decisions['rejected']),'updated':decisions['updated']},'counts':counts}
     sources={'summary':summary,'links':{'mainland':'https://www.moe.gov.cn/jyb_xwfb/moe_2082/siju/yywzxxgls/ztzl_yywzgfbz/201306/t20130601_186002.html','unicode':'https://www.unicode.org/reports/tr38/','opencc':'https://github.com/BYVoid/OpenCC/tree/fae2a0a911c30764e669a7d8b0591cd8e852934a/data/dictionary','variants':'https://dict.variants.moe.edu.tw/'},
-             'entries':{c:list({(item['label'],item['url']):item for item in references[c]}.values()) for c in sorted(set(mapping)|set(reviews),key=ord) if references[c]}}
+             'entries':provenance,'confirmations':confirmations}
+    for c in sorted(set(reviews)-set(mapping),key=ord):
+        sources['entries'][c]=list({(item['label'],item['url']):item for item in references[c]}.values())
     output.mkdir(parents=True,exist_ok=True)
     body=',\n'.join(json.dumps(c,ensure_ascii=False)+': '+json.dumps(v,ensure_ascii=False) for c,v in sorted(mapping.items(),key=lambda item:ord(item[0])))
     (output/'dictionary.json').write_text('{\n'+body+'\n}\n',encoding='utf-8',newline='\n')
-    for name,value in [('reviews',reviews),('sources',sources),('reference',reference)]:
+    for name,value in [('reviews',reviews),('sources',sources),('reference',reference),('version',{'version':summary['version'],'counts':counts,'lexicon':summary['lexicon']})]:
         (output/f'{name}.json').write_text(json.dumps(value,ensure_ascii=False,separators=(',',':')),encoding='utf-8',newline='\n')
     print(json.dumps(summary,ensure_ascii=False,indent=2));return summary
 

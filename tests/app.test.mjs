@@ -12,10 +12,13 @@ async function fixture(t, options = {}) {
         settings: {disableJavaScriptFileLoading: true, disableCSSFileLoading: true}});
     const { document } = window;
     document.write(html);
+    if (options.savedMode !== undefined) window.localStorage.setItem('glyphlens.mode', options.savedMode);
+    if (options.blockedStorage) Object.defineProperty(window, 'localStorage', {get() { throw new Error('Storage unavailable'); }});
     const saved = new Map(), copied = [], downloads = [], blobs = [];
     for (const [name, value] of Object.entries({window, document, navigator: window.navigator, fetch: async path => {
         path = String(path);
         if (path === 'access') return {ok: true, json: async () => ({canManage: false})};
+        if (path === 'version.json') return {ok: true, json: async () => ({version: options.dictionaryVersion || '1.0.0'})};
         if (path.startsWith('lexicon.json')) return {ok: true, json: async () => options.rules || []};
         if (path === 'dictionary.json') {
             if (options.dictionary) return options.dictionary(path);
@@ -55,7 +58,7 @@ async function fixture(t, options = {}) {
     };
     const convert = async text => { input(text); get('convertText').click(); await idle(); };
     const file = (name, text) => {
-        Object.defineProperty(get('fileInput'), 'files', {value: [{name, arrayBuffer: async () => new TextEncoder().encode(text).buffer}], configurable: true});
+        Object.defineProperty(get('fileInput'), 'files', {value: name ? [{name, arrayBuffer: typeof text === 'function' ? text : async () => new TextEncoder().encode(text).buffer}] : [], configurable: true});
         get('fileInput').dispatchEvent(new window.Event('change', {bubbles: true}));
     };
     return {window, document, get, radio, input, idle, convert, file, copied, downloads, blobs};
@@ -75,8 +78,10 @@ test('candidate markers stay visible before Start and after End while choices su
     radio('modeCandidates');assert.equal(get('startReview').disabled,true);
     await convert('乾乾');assert.equal(get('reviewPanel').hidden,false);assert.equal(get('reviewToolbar').hidden,true);assert.equal(get('candidatePicker').hidden,true);assert.equal(get('outputText').hidden,true);
     assert.equal(document.querySelectorAll('.review-word').length,2);
+    const startClass=get('startReview').className;
     assert(get('startReview').classList.contains('primary-button'));assert.deepEqual([...get('startReview').parentElement.children].map(button=>button.id),['copyOutput','downloadOutput','startReview']);
     get('startReview').click();assert.equal(get('reviewPanel').hidden,false);assert.equal(get('reviewStatus').textContent,'待校对 2 / 2 处');
+    assert.equal(get('startReview').className,startClass);assert.equal(get('outputLabel').textContent,'转换结果');
     document.querySelector('.review-word.is-active').dispatchEvent(new window.KeyboardEvent('keydown',{key:'2',bubbles:true,cancelable:true}));
     assert.equal(get('outputText').value,'干乾');get('previousCandidate').click();
     get('candidateChoices').querySelector('[data-candidate="乾"]').click();
@@ -94,16 +99,69 @@ test('editing the original invalidates choices and requires explicitly starting 
     input('新文本');assert.equal(get('outputText').value,'');assert.equal(get('copyOutput').disabled,true);
     assert.equal(get('downloadOutput').disabled,true);assert.equal(get('reviewPanel').hidden,true);assert.equal(get('startReview').disabled,true);
 });
-test('candidate files show marked previews before review and download selected text with original line endings', async t => {
+test('files import into the original first and share the normal conversion and proofreading actions', async t => {
     const {get,radio,file,idle,downloads,blobs}=await fixture(t);radio('modeCandidates');file('草稿.txt','乾\r\n');
-    get('convertFile').click();await idle();assert.equal(downloads.length,0);assert.equal(get('reviewPanel').hidden,false);assert.equal(get('reviewToolbar').hidden,true);assert.equal(get('candidatePicker').hidden,true);
+    await idle();assert.equal(get('convertFile'),null);assert.equal(get('chooseFile').textContent,'从文件导入文本');assert.equal(get('outputText').value,'');assert.equal(get('startReview').hidden,true);
+    get('convertText').click();await idle();assert.equal(downloads.length,0);assert.equal(get('reviewPanel').hidden,false);assert.equal(get('reviewToolbar').hidden,true);assert.equal(get('candidatePicker').hidden,true);
     assert.equal(get('inputText').value,'乾\r\n');get('startReview').click();
     get('candidateChoices').querySelector('[data-candidate="干"]').click();get('downloadOutput').click();
     assert.equal(downloads[0].name,'草稿-转换结果.txt');assert.equal(await blobs[0].text(),'干\r\n');
 });
-test('default file conversion keeps its direct download action', async t => {
-    const {get,file,idle,downloads,blobs}=await fixture(t);file('正文.txt','發乾');get('convertFile').click();await idle();
+test('default mode also imports without converting or downloading until explicitly requested', async t => {
+    const {get,file,idle,downloads,blobs}=await fixture(t);file('正文.txt','發乾');await idle();
+    assert.equal(get('inputText').value,'發乾');assert.equal(get('outputText').value,'');assert.equal(downloads.length,0);
+    get('convertText').click();await idle();assert.equal(get('outputText').value,'发乾');assert.equal(downloads.length,0);get('downloadOutput').click();
     assert.equal(downloads.length,1);assert.equal(await blobs[0].text(),'发乾');
+});
+
+test('a slow import never replaces newer typing and invalid UTF-8 leaves existing text intact', async t => {
+    const {get,file,idle,input,convert}=await fixture(t);let complete;
+    file('旧稿.txt',()=>new Promise(resolve=>{complete=resolve;}));input('新输入');
+    complete(new TextEncoder().encode('旧稿').buffer);await idle();assert.equal(get('inputText').value,'新输入');
+    await convert('乾');file('损坏.txt',async()=>new Uint8Array([0xff]).buffer);await idle();
+    assert.equal(get('inputText').value,'乾');assert.equal(get('outputText').value,'乾');assert.equal(get('conversionStatus').dataset.error,'true');
+    file(null);assert.equal(get('inputText').value,'乾');assert.equal(get('outputText').value,'乾');
+});
+
+test('the last used mode is restored and output keeps its fixed label', async t => {
+    const {document,window,get,radio,convert}=await fixture(t,{savedMode:'one2many'});
+    assert.equal(document.querySelector('input[name="mode"]:checked').value,'one2many');assert.equal(get('startReview').hidden,true);
+    await convert('發');assert.equal(get('outputLabel').textContent,'转换结果');assert.equal(get('startReview').hidden,true);
+    await convert('乾');assert.equal(get('startReview').hidden,false);get('startReview').click();
+    assert.equal(get('outputLabel').textContent,'转换结果');radio('modeDefault');
+    assert.equal(window.localStorage.getItem('glyphlens.mode'),'one2one');assert.equal(get('outputLabel').textContent,'转换结果');
+});
+
+test('invalid saved modes fall back to default conversion', async t => {
+    const {document}=await fixture(t,{savedMode:'unknown'});
+    assert.equal(document.querySelector('input[name="mode"]:checked').value,'one2one');
+});
+
+test('the footer shows independent installed dictionary and plugin versions', async t => {
+    const {get}=await fixture(t,{dictionaryVersion:'1.2.3'});await pause(0);
+    assert.equal(get('dictionaryVersion').textContent,'v1.2.3');assert.equal(get('appVersion').textContent,'v0.2.3');
+});
+
+test('unavailable storage does not prevent conversion or mode switching', async t => {
+    const {get,radio,convert}=await fixture(t,{blockedStorage:true});
+    radio('modeCandidates');await convert('乾');assert.equal(get('startReview').hidden,false);
+});
+
+test('the example demonstrates variant glyphs and contextual candidates without changing the chosen mode', async t => {
+    const table=JSON.parse(await readFile(new URL('../dictionary/data/dictionary.json',import.meta.url),'utf8'));
+    const {get,document,radio,idle,input}=await fixture(t,{
+        dictionary:async()=>({ok:true,json:async()=>table})
+    });
+    get('loadExample').click();await idle();
+    assert(get('loadExample').classList.contains('quiet-button'));
+    assert.match(get('inputText').value,/畢昇/);assert.match(get('inputText').value,/纔/);assert(!get('inputText').value.includes('\n'));
+    assert.match(get('outputText').value,/毕升/);assert.match(get('outputText').value,/才毕/);assert.equal(get('exampleSource').hidden,false);
+    assert.match(get('exampleSource').href,/oldid=7260838/);
+    assert.equal(document.querySelector('input[name="mode"]:checked').value,'one2one');
+    radio('modeCandidates');assert.equal(document.querySelectorAll('.review-word').length,1);assert.equal(get('startReview').hidden,false);
+    assert.equal(document.querySelectorAll('.review-word.is-reviewed').length,0);
+    document.querySelector('.review-word').click();get('candidateChoices').querySelector('[data-candidate="昇"]').click();assert.match(get('outputText').value,/毕昇/);
+    input('其他原文');assert.equal(get('exampleSource').hidden,true);
 });
 test('literal markup stays text and a late request never replaces newer input', async t => {
     let complete;const response=new Promise(resolve=>{complete=resolve;});

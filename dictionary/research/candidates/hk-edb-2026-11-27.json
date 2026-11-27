@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "status": "source-verification-only",
+  "checkedAt": "2026-11-27",
+  "source": "香港教育局《香港小學學習字詞表》电子版及《常用字字形表》注释",
+  "defaultDictionaryVersion": "1.0.0",
+  "comparison": {
+    "existingRelationRecordIds": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13],
+    "unencodedImageRecordIds": [12],
+    "newCharacters": 0,
+    "newRelations": 0,
+    "reviewScope": "仅核查新出处、图片身份及证据方向，不重新审核现有映射"
+  },
+  "scope": ["乾", "干", "幹", "於", "裏", "裡", "臺", "後", "復", "覆", "沈", "彷", "畫", "箚", "灶", "竈", "竃", "群", "爲", "啟", "啓"],
+  "records": [
+    {"id": 1, "character": "乾", "candidates": ["干", "乾"], "entry": "0043", "locator": "简化字栏及《簡化字總表》注", "proposal": "补充现有对应的原始出处，特定用法保留乾"},
+    {"id": 2, "character": "幹", "candidates": ["干"], "entry": "1183", "locator": "简化字栏", "proposal": "补充原始出处"},
+    {"id": 3, "character": "後", "candidates": ["后"], "entry": "1274", "locator": "简化字栏", "proposal": "补充原始出处，不扩大部件注释"},
+    {"id": 4, "character": "復", "candidates": ["复"], "entry": "1283", "locator": "简化字栏", "proposal": "补充原始出处，不扩大部件注释"},
+    {"id": 5, "character": "畫", "candidates": ["画"], "entry": "2631", "locator": "简化字栏", "proposal": "仅支持画，不支持额外候选划"},
+    {"id": 6, "character": "裏", "candidates": ["里"], "entry": "3705", "locator": "简化字栏", "proposal": "补充原始出处"},
+    {"id": 7, "character": "裡", "candidates": ["里"], "path": ["裡", "裏", "里"], "entry": "3705", "locator": "检索转向、《常用字字形表》注及简化字栏", "proposal": "保留两步证据"},
+    {"id": 8, "character": "啟", "candidates": ["启"], "entry": "1709", "locator": "简化字栏", "proposal": "仅为啟补来源，不自动识别图片异体"},
+    {"id": 9, "character": "臺", "candidates": ["台"], "entry": "0490", "locator": "检索转向及《常用字字形表》注", "proposal": "补充该具体对应的出处"},
+    {"id": 10, "character": "竈", "candidates": ["灶"], "entry": "2368", "images": ["https://www.edbchinese.hk/EmbziciwebRes/zx-rmk/2366.gif"], "proposal": "先确认图片对应 U+7AC8，不作为竃的出处", "uncertain": true},
+    {"id": 11, "character": "啓", "candidates": ["启"], "entry": "1709", "images": ["https://www.edbchinese.hk/EmbziciwebRes/YiTiZi_gif/1709a.gif", "https://www.edbchinese.hk/EmbziciwebRes/zx-rmk/1708.gif"], "proposal": "先确认图片的 Unicode，确认后保留啓→啟→启证据", "uncertain": true},
+    {"id": 12, "character": "於", "candidates": [], "entry": "1746", "images": ["https://www.edbchinese.hk/EmbziciwebRes/zx-rmk/1745.gif"], "proposal": "不分配额外码位，先区分字样和编码差异", "uncertain": true},
+    {"id": 13, "character": "羣", "candidates": ["群"], "entry": "3203", "proposal": "先核字头码位和方向，再判断能否作反向对照来源", "uncertain": true}
+  ],
+  "entryUrlTemplate": "https://www.edbchinese.hk/lexlist_ch/result.jsp?id={entry}&sortBy=stroke&jpC=lshk",
+  "notAdopted": ["部件注释不直接形成 Unicode 字符替换", "未从本批读音和例词推断额外关系", "2015/03 域名工作文件不作来源", "竃→灶保持手动维护来源"],
+  "directSearchNotFound": ["啓", "箚", "竃", "竈", "爲"]
+}

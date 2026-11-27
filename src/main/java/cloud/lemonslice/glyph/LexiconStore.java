@@ -50,15 +50,17 @@ public final class LexiconStore {
         });
         return result;
     }
-    private Map<String,Rule> merged(Map<String,Rule> saved) {
+    private Mono<LexiconCatalog> defaults() { return glyphs.importedLexicon().map(imported->imported.map(LexiconCatalog::new).orElse(catalog)); }
+    private Map<String,Rule> merged(Map<String,Rule> saved,LexiconCatalog catalog) {
         var result=new LinkedHashMap<String,Rule>();
         catalog.entries().forEach((id,entry)->result.put(id,new Rule(id,entry.character(),entry.candidate(),entry.contexts(),entry.note(),true,"GlyphLens","2026-11-27")));
         result.putAll(saved);return result;
     }
     public Mono<Page> list() {
-        return documents.read(NAME,State.class,State::initial).zipWith(glyphs.effective()).map(tuple->{
+        return Mono.zip(documents.read(NAME,State.class,State::initial),glyphs.effective(),defaults()).map(tuple->{
+            var catalog=tuple.getT3();
             var snapshot=tuple.getT1();var saved=saved(snapshot.value(),tuple.getT2());
-            var rows=merged(saved).values().stream().sorted(java.util.Comparator.comparingInt((Rule r)->r.character().codePointAt(0)).thenComparing(Rule::candidate).thenComparing(Rule::id))
+            var rows=merged(saved,catalog).values().stream().sorted(java.util.Comparator.comparingInt((Rule r)->r.character().codePointAt(0)).thenComparing(Rule::candidate).thenComparing(Rule::id))
                 .map(r->new Row(r.id(),r.character(),r.candidate(),r.contexts(),r.note(),r.enabled(),catalog.entries().containsKey(r.id())?saved.containsKey(r.id())?"modified":"default":"custom")).toList();
             return new Page(snapshot.version(),rows,false);
         });
@@ -68,9 +70,9 @@ public final class LexiconStore {
         return glyphs.effective().map(mapping->{var values=mapping.getOrDefault(c,List.of(c));return new Options(c,values,values.size()>1);});
     }
     public Mono<List<PublicRule>> publicRules() {
-        return documents.read(NAME,State.class,State::initial).zipWith(glyphs.effective()).map(tuple->{
+        return Mono.zip(documents.read(NAME,State.class,State::initial),glyphs.effective(),defaults()).map(tuple->{
             var mapping=tuple.getT2();
-            return merged(saved(tuple.getT1().value(),mapping)).values().stream().filter(Rule::enabled)
+            return merged(saved(tuple.getT1().value(),mapping),tuple.getT3()).values().stream().filter(Rule::enabled)
                 .filter(rule->{var values=mapping.getOrDefault(rule.character(),List.of());return values.size()>1 && values.contains(rule.candidate());})
                 .map(rule->new PublicRule(rule.character(),rule.candidate(),rule.contexts())).toList();
         });
@@ -92,7 +94,8 @@ public final class LexiconStore {
     }
     public Mono<GlyphStore.Saved> save(Request request,String actor) {
         String character=UnicodeInput.character(request.character()),candidate=UnicodeInput.character(request.candidate()),note=GlyphStore.note(request.note());
-        return glyphs.effective().flatMap(mapping->{
+        return glyphs.effective().zipWith(defaults()).flatMap(tuple->{
+            var mapping=tuple.getT1();var catalog=tuple.getT2();
             var values=mapping.getOrDefault(character,List.of());
             if(request.enabled() && (values.size()<2 || !values.contains(candidate)))return Mono.error(UnicodeInput.invalid("请选择该原字的已确认多候选字形"));
             var contexts=contexts(request,mapping,candidate);
@@ -100,7 +103,7 @@ public final class LexiconStore {
                 var rules=saved(snapshot.value(),mapping);
                 String id=request.id()==null || request.id().isBlank()?UUID.randomUUID().toString():request.id();
                 rules.put(id,new Rule(id,character,candidate,contexts,note,request.enabled(),actor,Instant.now().toString()));
-                if(merged(rules).values().stream().mapToLong(rule->rule.contexts().size()).sum()>5000)return Mono.error(UnicodeInput.invalid("词条数量已达上限"));
+                if(merged(rules,catalog).values().stream().mapToLong(rule->rule.contexts().size()).sum()>5000)return Mono.error(UnicodeInput.invalid("词条数量已达上限"));
                 var encoded=new LinkedHashMap<String,JsonNode>();rules.forEach((key,rule)->encoded.put(key,mapper.valueToTree(rule)));
                 return documents.write(snapshot,request.version(),new State(encoded)).map(GlyphStore.Saved::new);
             });

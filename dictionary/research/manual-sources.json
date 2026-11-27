@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "description": "Explicit maintainer additions whose original documentary source still needs verification. These records do not introduce candidates or substitute approval for documentary evidence.",
+  "records": [
+    {
+      "character": "竃",
+      "candidate": "灶",
+      "label": "手动维护来源",
+      "contribution": "维护者手工补充并确认",
+      "note": "维护者手工补充，原始文献出处尚待核对。"
+    }
+  ]
+}

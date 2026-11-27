@@ -70,6 +70,12 @@
     "sha256": "cb729360aa320a79cf4e3dbf61a0fd85b6c12b588d0e67d1f6b983745d4d129e",
     "use": "Maintainer-confirmed defaults and excluded relations; no accounts or live audit history."
   },
+  "manual-sources": {
+    "file": "manual-sources.json",
+    "updated": "2026-11-27",
+    "sha256": "175cd3a7cb022aa28fa3e9d9f78acaeff56b9b5a9f6a5c2ef82e9c703607c668",
+    "use": "Explicit manual additions without a verified original document; no external source is claimed and no candidates are added."
+  },
   "default-context-lexicon": {
     "file": "../data/lexicon.json",
     "updated": "2026-11-27",

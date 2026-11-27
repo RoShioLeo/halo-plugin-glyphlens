@@ -11,10 +11,13 @@ class PublicDictionaryTest {
         var glyphs=mock(GlyphStore.class);var lexicon=mock(LexiconStore.class);
         when(glyphs.effective()).thenReturn(Mono.just(Map.of("乾",List.of("干","乾"),"︽",List.of("《"))));
         when(lexicon.publicRules()).thenReturn(Mono.just(List.of()));
+        when(glyphs.version()).thenReturn(Mono.just(Map.of("version","1.0.0")));
         var routes=new PublicRoutes(glyphs,lexicon,mock(FeedbackStore.class),mock(SuperAdministrator.class));
         var client=WebTestClient.bindToRouterFunction(routes.glyphLensWeb()).build();
         client.get().uri("/tools/glyphlens/dictionary.json").exchange().expectStatus().isOk().expectBody().jsonPath("$.乾[0]").isEqualTo("干").jsonPath("$.︽[0]").isEqualTo("《");
         client.get().uri("/tools/glyphlens/lexicon.json").exchange().expectStatus().isOk().expectBody().json("[]");
+        client.get().uri("/tools/glyphlens/version.json").exchange().expectStatus().isOk().expectBody().jsonPath("$.version").isEqualTo("1.0.0");
+        for(String name:List.of("app.js","example.js","engine.js","lexicon.js","review-document.js","review-view.js","appearance.js"))client.get().uri("/tools/glyphlens/"+name).exchange().expectStatus().isOk().expectHeader().contentTypeCompatibleWith("text/javascript");
         for(String path:List.of("/tools/glyphlens/dictionaries/v2t.json","/tools/glyphlens/dictionaries/v2s.json","/tools/char/char_converter/data/v2t.json"))client.get().uri(path).exchange().expectStatus().isNotFound();
         verify(glyphs,times(1)).effective();
     }

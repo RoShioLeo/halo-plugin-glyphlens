@@ -1,11 +1,19 @@
 // SPDX-License-Identifier: MIT
 import { GlyphConverter } from './engine.js';
 import { ReviewView } from './review-view.js';
+import { example } from './example.js';
 let converterCache = null;
 const element = id => document.getElementById(id);
+const modeStorageKey = 'glyphlens.mode';
+try {
+    const savedMode = window.localStorage.getItem(modeStorageKey);
+    if (savedMode === 'one2one' || savedMode === 'one2many') {
+        element(savedMode === 'one2many' ? 'modeCandidates' : 'modeDefault').checked = true;
+    }
+} catch (_) { /* Storage may be unavailable in private or restricted browsers. */ }
 const selected = name => [...document.getElementsByName(name)].find(input => input.checked).value;
 const isReviewMode = () => selected('mode') === 'one2many';
-let result = null, reviewing = false, revision = 0, operations = 0, outputFilename = '字镜-转换结果.txt';
+let result = null, reviewing = false, revision = 0, operations = 0, importedText = null, outputFilename = '字镜-转换结果.txt';
 const status = (message, error = false) => {
     element('conversionStatus').textContent = message;
     element('conversionStatus').dataset.error = String(error);
@@ -15,7 +23,14 @@ fetch('access', {credentials: 'same-origin', cache: 'no-store'})
     .then(response => response.ok ? response.json() : {canManage: false})
     .then(access => { element('dictionaryAdmin').hidden = access.canManage !== true; })
     .catch(() => { element('dictionaryAdmin').hidden = true; });
-window.addEventListener('focus', () => { converterCache = null; });
+function refreshDictionaryVersion() {
+    fetch('version.json', {credentials: 'same-origin', cache: 'no-store'})
+        .then(response => response.ok ? response.json() : null)
+        .then(metadata => {if (/^\d+\.\d+\.\d+$/.test(metadata?.version)) element('dictionaryVersion').textContent = 'v' + metadata.version;})
+        .catch(() => {});
+}
+refreshDictionaryVersion();
+window.addEventListener('focus', () => { converterCache = null;refreshDictionaryVersion(); });
 
 const modeHelp = element('modeHelp'), modeHelpToggle = element('modeHelpToggle'), modeHelpContent = element('modeHelpContent');
 let helpPinned = false;
@@ -50,12 +65,9 @@ function renderOutput() {
     element('outputText').value = text;
     element('copyOutput').disabled = element('downloadOutput').disabled = !text;
     element('outputText').hidden = preview;
-    element('outputLabel').textContent = active ? '校对结果' : '转换结果';
-    element('startReview').hidden = !isReviewMode();
+    element('startReview').hidden = !isReviewMode() || !result?.positions.length;
     element('startReview').disabled = !result;
     element('startReview').textContent = active ? '结束校对' : '开始校对';
-    element('startReview').classList.toggle('primary-button',!active);
-    element('startReview').classList.toggle('quiet-button',active);
     if (preview) review.show(result,active);
     else element('reviewPanel').hidden = true;
 }
@@ -64,6 +76,9 @@ function invalidate() {
     revision++;
     result = null;
     reviewing = false;
+    importedText = null;
+    outputFilename = '字镜-转换结果.txt';
+    element('exampleSource').hidden = true;
     review.clear();
     renderOutput();
     status('');
@@ -71,8 +86,8 @@ function invalidate() {
 
 function updateFileControls() {
     element('convertText').disabled = operations > 0;
-    element('convertFile').disabled = operations > 0 || !element('fileInput').files[0];
-    element('convertFile').textContent = isReviewMode() ? '转换文件' : '转换并下载';
+    element('chooseFile').disabled = operations > 0;
+    element('loadExample').disabled = operations > 0;
 }
 
 async function currentConverter() {
@@ -87,29 +102,37 @@ async function currentConverter() {
     return converter;
 }
 
-async function runConversion(action) {
+async function runConversion(action, failureMessage = '转换失败，请检查网络或文本文件后重试。') {
     const token = ++revision;
     operations++;
     updateFileControls();
     status('');
     try { await action(token); }
-    catch (_) { if (token === revision) status('转换失败，请检查网络或文本文件后重试。', true); }
+    catch (_) { if (token === revision) status(failureMessage, true); }
     finally { operations--; updateFileControls(); }
 }
 
 async function convertInput(token) {
-    const input = element('inputText').value;
+    const displayedInput = element('inputText').value;
+    const input = importedText?.displayed === displayedInput ? importedText.original : displayedInput;
     const converter = await currentConverter();
-    if (token !== revision || input !== element('inputText').value) return;
+    if (token !== revision || displayedInput !== element('inputText').value) return;
     result = converter.review(input);
     reviewing = false;
-    outputFilename = '字镜-转换结果.txt';
     renderOutput();
 }
 
 element('convertText').addEventListener('click', () => runConversion(convertInput));
+element('loadExample').addEventListener('click', () => {
+    element('inputText').value = example.text;
+    invalidate();
+    const source = element('exampleSource');
+    source.href = example.url;source.textContent = '示例出处：' + example.title;source.hidden = false;
+    runConversion(convertInput);
+});
 element('inputText').addEventListener('input', invalidate);
 document.querySelectorAll('input[name="mode"]').forEach(input => input.addEventListener('change', () => {
+    try { window.localStorage.setItem(modeStorageKey, selected('mode')); } catch (_) { /* Conversion also works without storage. */ }
     revision++;
     reviewing = false;
     renderOutput();
@@ -170,24 +193,19 @@ element('downloadOutput').addEventListener('click', downloadResult);
 element('chooseFile').addEventListener('click', () => element('fileInput').click());
 element('fileInput').addEventListener('change', () => {
     const file = element('fileInput').files[0];
-    invalidate();
-    updateFileControls();
-    status(file ? file.name : '');
-});
-element('convertFile').addEventListener('click', () => runConversion(async token => {
-    const file = element('fileInput').files[0];
     if (!file) return;
-    const [converter, bytes] = await Promise.all([currentConverter(), file.arrayBuffer()]);
-    if (token !== revision || file !== element('fileInput').files[0]) return;
-    const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-    element('inputText').value = text;
-    result = converter.review(text);
-    reviewing = false;
-    outputFilename = file.name.replace(/\.[^.]+$/, '') + '-转换结果.txt';
-    renderOutput();
-    if (!isReviewMode()) downloadResult();
-    else status('文件已载入');
-}));
+    runConversion(async token => {
+        const text = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer());
+        if (token !== revision) return;
+        element('inputText').value = text;
+        invalidate();
+        importedText = { original: text, displayed: element('inputText').value };
+        outputFilename = file.name.replace(/\.[^.]+$/, '') + '-转换结果.txt';
+        status('已导入 ' + file.name);
+        element('inputText').focus();
+    }, '导入失败，请选择 UTF-8 编码的文本文件。').finally(() => { element('fileInput').value = ''; });
+});
+renderOutput();
 updateFileControls();
 
 function feedbackCharacter(input, optional = false) {

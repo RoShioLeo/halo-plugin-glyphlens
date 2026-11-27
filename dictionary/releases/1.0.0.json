@@ -1,0 +1,13 @@
+{
+  "format": "glyphlens-dictionary",
+  "formatVersion": 1,
+  "dictionaryVersion": "1.0.0",
+  "files": {
+    "dictionary.json": "5927bb077899f89b7aaf8e29318274aeb2048f6551dd6766a38a24233c11c134",
+    "lexicon.json": "2987f7a57863bb7622fa29e03bcce06ec6ae5b404d2a22538c840305fa69c32b",
+    "sources.json": "72dc8482728efa95af9b5b24369c1e030fe4cbd0526da2e28b96083515b4420b",
+    "reviews.json": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "reference.json": "d6645ceca89e6eb22090e6d00af6f840a9488a1ad42bd40625a29056dd5e6375",
+    "version.json": "c095eb0b92cf190a9d9240b3aadc225dd7903be6d425187e5f23af700a90b759"
+  }
+}

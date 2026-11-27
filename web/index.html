@@ -46,7 +46,7 @@
             </div>
             <div class="controls">
                 <fieldset class="field">
-                    <legend>转换方式</legend>
+                    <legend>模式</legend>
                     <div class="mode-controls">
                     <div class="segmented">
                         <input type="radio" name="mode" id="modeDefault" value="one2one" checked>
@@ -56,7 +56,7 @@
                         <span class="segmented-thumb" aria-hidden="true"></span>
                     </div>
                     <div id="modeHelp" class="mode-help">
-                        <button type="button" id="modeHelpToggle" class="mode-help-toggle" aria-label="转换方式说明" aria-expanded="false" aria-controls="modeHelpContent" aria-describedby="modeHelpContent">
+                        <button type="button" id="modeHelpToggle" class="mode-help-toggle" aria-label="模式说明" aria-expanded="false" aria-controls="modeHelpContent" aria-describedby="modeHelpContent">
                             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 3.5"/><path d="M12 16h.01"/></svg>
                         </button>
                         <div id="modeHelpContent" class="mode-help-content" role="tooltip" hidden>
@@ -69,8 +69,7 @@
                 </fieldset>
                 <div class="file-actions">
                     <input type="file" id="fileInput" accept=".txt,text/plain" class="visually-hidden">
-                    <button type="button" id="chooseFile">选择文件</button>
-                    <button type="button" id="convertFile" disabled>转换并下载</button>
+                    <button type="button" id="chooseFile">从文件导入文本</button>
                 </div>
             </div>
             <div class="workspace">
@@ -78,6 +77,7 @@
                     <div class="panel-heading">
                         <label for="inputText">原文</label>
                         <div class="panel-actions">
+                            <button type="button" id="loadExample" class="quiet-button">示例</button>
                             <button type="button" id="clearText" class="quiet-button">清空</button>
                             <button type="button" id="convertText" class="primary-button">转换</button>
                         </div>
@@ -114,10 +114,11 @@
             </div>
             <div class="bottom-actions">
                 <p id="conversionStatus" role="status" aria-live="polite"></p>
+                <a id="exampleSource" class="example-source" target="_blank" rel="noopener noreferrer" hidden></a>
             </div>
         </main>
         <footer class="source-credit">
-            <span>GlyphLens · LemonSlice ·
+            <span>GlyphLens <span id="appVersion">v0.2.3</span> · 字库 <span id="dictionaryVersion">v1.0.0</span> · LemonSlice ·
                 <a href="https://github.com/RoShioLeo/halo-plugin-glyphlens" target="_blank" rel="noopener noreferrer">源码</a> ·
                 <a href="LICENSE" rel="license">MIT</a>
             </span>
@@ -138,7 +139,7 @@
             <input id="feedbackCandidate" type="text" maxlength="10" placeholder="选填" autocomplete="off" aria-describedby="feedbackCandidateHelp">
             <small id="feedbackCandidateHelp">支持直接输入字形或 Unicode 码，例如：一、U+4E00、4E00。</small>
             <label for="feedbackNote">说明</label>
-            <textarea id="feedbackNote" rows="3" maxlength="500"></textarea>
+            <textarea id="feedbackNote" rows="3" maxlength="500" placeholder="建议提供权威来源，便于审核时参考。"></textarea>
             <p id="feedbackStatus" role="status" aria-live="polite"></p>
             <div class="feedback-actions"><button type="button" id="cancelFeedback">取消</button><button type="submit" class="primary-button" id="submitFeedback">提交反馈</button></div>
         </form>

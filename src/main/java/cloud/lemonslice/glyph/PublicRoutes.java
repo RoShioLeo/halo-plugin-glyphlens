@@ -20,7 +20,7 @@ import reactor.core.publisher.Mono;
 
 @Component
 public final class PublicRoutes {
-    private static final Set<String> FILES=Set.of("index.html","styles.css","app.js","engine.js","lexicon.js","review-document.js","review-view.js","appearance.js","img/lemon.svg","img/glyphlens.svg","img/glyphlens-dark.svg","LICENSE","NOTICE.md");
+    private static final Set<String> FILES=Set.of("index.html","styles.css","app.js","example.js","engine.js","lexicon.js","review-document.js","review-view.js","appearance.js","img/lemon.svg","img/glyphlens.svg","img/glyphlens-dark.svg","LICENSE","NOTICE.md");
     private final GlyphStore glyphs;
     private final LexiconStore lexicon;
     private final FeedbackStore feedback;
@@ -34,6 +34,7 @@ public final class PublicRoutes {
             .GET("/tools/glyphlens/",request -> file("index.html"))
             .GET("/tools/glyphlens/access",request -> administrator.allowed().flatMap(allowed -> json(Map.of("canManage",allowed))))
             .GET("/tools/glyphlens/dictionary.json",request -> glyphs.effective().flatMap(PublicRoutes::json))
+            .GET("/tools/glyphlens/version.json",request -> glyphs.version().flatMap(PublicRoutes::json))
             .GET("/tools/glyphlens/lexicon.json",request -> lexicon.publicRules().flatMap(PublicRoutes::json))
             .GET("/tools/glyphlens/feedback-token",this::csrf)
             .POST("/tools/glyphlens/feedback",request -> request.bodyToMono(FeedbackStore.Request.class).flatMap(body -> request.exchange().getSession().flatMap(session -> {

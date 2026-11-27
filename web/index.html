@@ -47,12 +47,24 @@
             <div class="controls">
                 <fieldset class="field">
                     <legend>转换方式</legend>
+                    <div class="mode-controls">
                     <div class="segmented">
                         <input type="radio" name="mode" id="modeDefault" value="one2one" checked>
                         <label for="modeDefault">默认转换</label>
                         <input type="radio" name="mode" id="modeCandidates" value="one2many">
                         <label for="modeCandidates">多字候选</label>
                         <span class="segmented-thumb" aria-hidden="true"></span>
+                    </div>
+                    <div id="modeHelp" class="mode-help">
+                        <button type="button" id="modeHelpToggle" class="mode-help-toggle" aria-label="转换方式说明" aria-expanded="false" aria-controls="modeHelpContent" aria-describedby="modeHelpContent">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 3.5"/><path d="M12 16h.01"/></svg>
+                        </button>
+                        <div id="modeHelpContent" class="mode-help-content" role="tooltip" hidden>
+                            <p>多字候选中，带下划线的字有多个候选，点击即可选择字形。</p>
+                            <p>点击“开始校对”逐处检查，用左右箭头切换位置；其余字形无误时，可点击“确认剩余”。</p>
+                            <p>虚线表示待校对，实线表示已确认，两者都可再次点击修改。复制、下载使用当前选定的字形。</p>
+                        </div>
+                    </div>
                     </div>
                 </fieldset>
                 <div class="file-actions">
@@ -76,19 +88,19 @@
                     <div class="panel-heading">
                         <span id="outputLabel">转换结果</span>
                         <div class="panel-actions">
-                            <button type="button" id="startReview" class="quiet-button" disabled hidden>开始校对</button>
                             <button type="button" id="copyOutput" class="quiet-button" disabled>复制</button>
                             <button type="button" id="downloadOutput" class="quiet-button" disabled>下载</button>
+                            <button type="button" id="startReview" class="primary-button" disabled hidden>开始校对</button>
                         </div>
                     </div>
                     <textarea id="outputText" rows="13" spellcheck="false" readonly aria-labelledby="outputLabel"></textarea>
                     <div id="reviewPanel" class="review-shell" hidden>
-                        <div class="review-toolbar">
+                        <div id="reviewToolbar" class="review-toolbar" hidden>
                             <span id="reviewStatus" role="status" aria-live="polite"></span>
                             <div class="review-navigation">
-                                <button type="button" id="confirmRemaining" class="quiet-button" title="按当前显示的字形确认剩余位置">确认剩余</button>
-                                <button type="button" id="previousCandidate" class="quiet-button">上一处</button>
-                                <button type="button" id="nextCandidate" class="quiet-button">下一处</button>
+                                <button type="button" id="previousCandidate" class="quiet-button review-step" aria-label="上一处" title="上一处"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button>
+                                <button type="button" id="nextCandidate" class="quiet-button review-step" aria-label="下一处" title="下一处"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10 6 6 6-6 6"/></svg></button>
+                                <button type="button" id="confirmRemaining" class="primary-button" title="按当前显示的字形确认剩余位置">确认剩余</button>
                             </div>
                         </div>
                         <div id="candidatePicker" class="candidate-picker" hidden>

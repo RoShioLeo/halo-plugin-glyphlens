@@ -17,24 +17,46 @@ fetch('access', {credentials: 'same-origin', cache: 'no-store'})
     .catch(() => { element('dictionaryAdmin').hidden = true; });
 window.addEventListener('focus', () => { converterCache = null; });
 
+const modeHelp = element('modeHelp'), modeHelpToggle = element('modeHelpToggle'), modeHelpContent = element('modeHelpContent');
+let helpPinned = false;
+function showModeHelp(open) {
+    modeHelpContent.hidden = !open;
+    modeHelpToggle.setAttribute('aria-expanded', String(open));
+}
+modeHelpToggle.addEventListener('click', () => { helpPinned = !helpPinned; showModeHelp(helpPinned); });
+modeHelp.addEventListener('pointerenter', event => { if (event.pointerType === 'mouse') showModeHelp(true); });
+modeHelp.addEventListener('pointerleave', event => {
+    if (event.pointerType === 'mouse' && !helpPinned && !modeHelp.contains(document.activeElement)) showModeHelp(false);
+});
+modeHelpToggle.addEventListener('focus', () => showModeHelp(true));
+modeHelp.addEventListener('focusout', event => { if (!helpPinned && !modeHelp.contains(event.relatedTarget)) showModeHelp(false); });
+document.addEventListener('pointerdown', event => { if (!modeHelp.contains(event.target)) { helpPinned = false; showModeHelp(false); } });
+document.addEventListener('keydown', event => { if (event.key === 'Escape') { helpPinned = false; showModeHelp(false); } });
+
 const review = new ReviewView({
-    panel: element('reviewPanel'), text: element('reviewText'), status: element('reviewStatus'),
+    panel: element('reviewPanel'), toolbar: element('reviewToolbar'), text: element('reviewText'), status: element('reviewStatus'),
     previous: element('previousCandidate'), next: element('nextCandidate'), picker: element('candidatePicker'),
     confirmRemaining: element('confirmRemaining'),
     source: element('candidateSource'), choices: element('candidateChoices'),
-}, document => { if (result === document) { renderOutput(); status(''); } });
+}, document => { if (result === document) { renderOutput(); status(''); } },()=>{
+    if(!result || !isReviewMode())return;
+    reviewing=true;renderOutput();status('');
+});
 
 function renderOutput() {
     const text = result?.text() ?? '';
-    const active = !!result && isReviewMode() && reviewing;
+    const preview = !!result && isReviewMode();
+    const active = preview && reviewing;
     element('outputText').value = text;
     element('copyOutput').disabled = element('downloadOutput').disabled = !text;
-    element('outputText').hidden = active;
+    element('outputText').hidden = preview;
     element('outputLabel').textContent = active ? '校对结果' : '转换结果';
     element('startReview').hidden = !isReviewMode();
     element('startReview').disabled = !result;
     element('startReview').textContent = active ? '结束校对' : '开始校对';
-    if (active) review.show(result);
+    element('startReview').classList.toggle('primary-button',!active);
+    element('startReview').classList.toggle('quiet-button',active);
+    if (preview) review.show(result,active);
     else element('reviewPanel').hidden = true;
 }
 

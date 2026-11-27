@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 export class ReviewView {
-    constructor(elements, onChange) {
+    constructor(elements, onChange, onActivate) {
         this.elements = elements;
         this.onChange = onChange;
+        this.onActivate = onActivate;
+        this.reviewing = false;
         this.buttons = new Map();
         this.active = null;
         const {panel, previous, next, text, choices} = elements;
@@ -11,13 +13,17 @@ export class ReviewView {
         elements.confirmRemaining.addEventListener('click',()=>this.confirmRemaining());
         text.addEventListener('click', event => {
             const button = event.target.closest?.('[data-review-position]');
-            if (button) this.activate(Number(button.dataset.reviewPosition));
+            if (button) {
+                if(!this.reviewing)this.onActivate();
+                this.activate(Number(button.dataset.reviewPosition));
+            }
         });
         choices.addEventListener('click', event => {
             const button = event.target.closest?.('[data-candidate]');
             if (button) this.choose(button.dataset.candidate);
         });
         panel.addEventListener('keydown', event => {
+            if (!this.reviewing) return;
             if (!event.target.closest?.('[data-review-position], [data-candidate]')) return;
             if (['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(event.key)) {
                 event.preventDefault();
@@ -37,14 +43,17 @@ export class ReviewView {
     clear() {
         this.document = null;
         this.active = null;
+        this.reviewing = false;
         this.buttons.clear();
         this.elements.text.replaceChildren();
         this.elements.choices.replaceChildren();
         this.elements.picker.hidden = true;
+        this.elements.toolbar.hidden = true;
         this.elements.panel.hidden = true;
     }
-    show(document) {
-        if (this.document !== document) {
+    show(document, reviewing = false) {
+        const changed=this.document!==document, wasReviewing=this.reviewing;
+        if (changed) {
             this.clear();
             this.document = document;
             const owner = this.elements.text.ownerDocument, fragment = owner.createDocumentFragment();
@@ -55,7 +64,7 @@ export class ReviewView {
                     button.type = 'button';
                     button.className = 'review-word';
                     button.dataset.reviewPosition = String(index);
-                    button.tabIndex = -1;
+                    button.tabIndex = 0;
                     button.setAttribute('aria-controls', this.elements.picker.id);
                     this.buttons.set(index, button);
                     this.updateWord(index);
@@ -63,7 +72,18 @@ export class ReviewView {
                 }
             });
             this.elements.text.append(fragment);
-            this.activate(document.next(null,1,true), false);
+        }
+        this.reviewing=reviewing;
+        this.elements.toolbar.hidden=!reviewing;
+        if(!reviewing) {
+            this.elements.picker.hidden=true;
+            this.active=null;
+            for(const button of this.buttons.values()) {
+                button.classList.remove('is-active');button.tabIndex=0;button.setAttribute('aria-expanded','false');
+            }
+        } else if(changed || !wasReviewing) {
+            for(const button of this.buttons.values())button.tabIndex=-1;
+            this.activate(document.next(null,1,true)??document.positions[0],false);
         }
         this.elements.panel.hidden = false;
         this.updateStatus();

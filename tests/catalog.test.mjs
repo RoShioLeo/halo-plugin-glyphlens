@@ -82,7 +82,7 @@ test('bundled simplified context words choose reviewed glyphs and leave room for
 
 test('default source counts account for every candidate relation without conflating source characters',()=>{
     const summary=read('data/sources.json').summary;
-    assert.equal(summary.version,'0.2.1');
+    assert.equal(summary.version,fs.readFileSync(new URL('../gradle.properties',import.meta.url),'utf8').match(/^version=(.+)$/m)[1].trim());
     assert.equal(summary.counts.records,Object.keys(dictionary).length);
     assert.equal(summary.counts.relations,Object.values(dictionary).reduce((n,values)=>n+values.length,0));
     assert.equal(Object.values(summary.source_counts).reduce((n,source)=>n+source.relations,0),summary.counts.relations);

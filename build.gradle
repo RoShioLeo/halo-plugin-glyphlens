@@ -15,7 +15,14 @@ dependencies {
 }
 java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8'; options.release = 21 }
-test { useJUnitPlatform() }
+test {
+    useJUnitPlatform()
+    doFirst {
+        // Install Mockito before the JVM starts; Windows sandboxes can block self-attach.
+        def mockitoAgent = classpath.files.find { it.name.startsWith('mockito-core-') && it.name.endsWith('.jar') }
+        if (mockitoAgent != null) jvmArgs "-javaagent:${mockitoAgent.absolutePath}"
+    }
+}
 tasks.named('processResources') {
     inputs.property('glyphlensVersion', project.version.toString())
     inputs.file('dictionary/VERSION')

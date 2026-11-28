@@ -41,6 +41,6 @@ async function downloadPackage(){
     <section><h3>致谢</h3><p>感谢 @小兽KEMONO 提供技术支持</p></section>
 </VCard></template>
 <style scoped>
-.actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px}.head{gap:12px;flex-wrap:wrap}
-.head{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}section+section{margin-top:28px}h3{font-size:14px;font-weight:600;margin:0 0 8px}h3 span{font-weight:400;margin-left:8px}p{margin:8px 0;font-size:13px;line-height:1.7}a{color:#8b6a17;text-decoration:underline}.muted{opacity:.7}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;padding:10px 12px;border-bottom:1px solid #94a3b830;line-height:1.7;vertical-align:top}th{font-weight:500}td:first-child{min-width:160px}
+.actions{display:flex;align-items:center;flex-wrap:wrap;gap: 8px}.head{gap: 16px;flex-wrap:wrap}
+.head{display:flex;align-items:center;justify-content:space-between;margin-bottom: 32px}section+section{margin-top: 32px}h3{font-size:14px;font-weight:600;margin: 0 0 8px}h3 span{font-weight:400;margin-left: 8px}p{margin: 8px 0;font-size: var(--ls-control-font-size);line-height:1.7}a{color:var(--ls-link);text-decoration:underline}.muted{opacity:.7}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;font-size: var(--ls-control-font-size)}th,td{text-align:left;padding: 8px 16px;border-bottom:1px solid var(--ls-faint);line-height:1.7;vertical-align:top}th{font-weight:500}td:first-child{min-width:160px}
 </style>

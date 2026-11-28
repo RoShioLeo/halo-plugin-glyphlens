@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: MIT
+import './design-tokens.css';
+import './design-system.css';
 import { definePlugin } from '@halo-dev/ui-shared';
 import { markRaw } from 'vue';
 import DictionaryView from './DictionaryView.vue';

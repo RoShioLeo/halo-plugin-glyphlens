@@ -4,6 +4,7 @@ tasks.register('pnpmBuild', PnpmTask) {
     args = ['build']
     dependsOn tasks.named('pnpmInstall')
     inputs.dir('src')
+    inputs.dir(rootProject.layout.projectDirectory.dir('design'))
     inputs.files('package.json', 'vite.config.mjs')
     outputs.dir(layout.buildDirectory.dir('dist'))
 }

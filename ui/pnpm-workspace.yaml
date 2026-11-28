@@ -1,0 +1,4 @@
+# Keep dependency files inside the repository and avoid long Windows symlink paths.
+nodeLinker: hoisted
+packageImportMethod: copy
+storeDir: node_modules/.cache/pnpm-store

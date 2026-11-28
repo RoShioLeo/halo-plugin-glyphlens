@@ -21,5 +21,5 @@ onMounted(load);
     </tbody></table></div>
 </VCard></template>
 <style scoped>
-.toolbar,.buttons{display:flex;align-items:center;gap:8px;justify-content:space-between}.toolbar{margin-bottom:20px}.toolbar :deep([data-type=select]){margin:0;max-width:220px}.buttons{justify-content:start}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;padding:12px;border-bottom:1px solid #94a3b830;vertical-align:middle}.glyph{font-size:22px}small{display:block;font-size:10px;opacity:.6}
+.toolbar,.buttons{display:flex;align-items:center;gap: 8px;justify-content:space-between}.toolbar{margin-bottom: 16px}.toolbar :deep([data-type=select]){margin: 0;max-width:220px}.buttons{justify-content:start}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;font-size: var(--ls-control-font-size)}th,td{text-align:left;padding: 16px;border-bottom:1px solid var(--ls-faint);vertical-align:middle}.glyph{font-size:22px}small{display:block;font-size: var(--ls-label-font-size);opacity:.6}
 </style>

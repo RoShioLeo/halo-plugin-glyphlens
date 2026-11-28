@@ -1,0 +1,8 @@
+/* Scoped to the dictionary workspace and its child views. */
+.dictionary-page { font-family: var(--ls-font-sans); color: var(--ls-ink); }
+@media (max-width: 760px) {
+  .dictionary-page button {
+    min-width: var(--ls-control-height);
+    min-height: var(--ls-control-height);
+  }
+}

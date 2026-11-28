@@ -7,3 +7,14 @@
 __pycache__/
 .DS_Store
 /dictionary/dist/
+
+# Halo development data and machine-specific configuration.
+/workplace/
+/.runtime/
+.env
+.env.*
+!.env.example
+*.credential.xml
+*.credentials.xml
+*.credentials.dpapi
+*.class

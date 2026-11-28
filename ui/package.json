@@ -4,7 +4,7 @@
   "private": true,
   "license": "MIT",
   "type": "module",
-  "scripts": {"build": "vite build"},
+  "scripts": {"build": "node ../design/generate.mjs --project glyphlens --check && vite build"},
   "dependencies": {"@halo-dev/components": "2.26.0", "@halo-dev/ui-shared": "2.26.0", "vue": "3.5.41"},
   "devDependencies": {"@halo-dev/ui-plugin-bundler-kit": "2.26.0", "@vitejs/plugin-vue": "6.0.10", "vite": "8.3.5", "typescript": "6.0.3", "happy-dom": "21.0.4"},
   "packageManager": "pnpm@12.16.1"
